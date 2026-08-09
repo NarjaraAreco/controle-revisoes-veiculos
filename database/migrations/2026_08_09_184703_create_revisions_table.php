@@ -13,6 +13,17 @@ return new class extends Migration
     {
         Schema::create('revisions', function (Blueprint $table) {
             $table->id();
+
+            $table->foreignId('vehicle_id')
+                ->constrained('vehicles')
+                ->cascadeOnDelete();
+
+            $table->date('revision_date');
+            $table->unsignedInteger('mileage');
+            $table->text('description');
+            $table->decimal('cost', 10, 2)->nullable();
+            $table->date('next_revision_date')->nullable();
+
             $table->timestamps();
         });
     }
