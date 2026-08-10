@@ -81,6 +81,6 @@ class VehicleController extends Controller
         $vehicle->delete();
 
         return to_route('vehicles.index')
-            ->with('success', 'Veículo excluído com sucesso.');
+            ->with('success', 'Ve   ículo excluído com sucesso.');
     }
 }
