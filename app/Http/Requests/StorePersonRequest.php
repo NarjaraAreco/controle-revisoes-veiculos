@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use App\Rules\ValidCpf;
+use Illuminate\Validation\Rule;
 
 class StorePersonRequest extends FormRequest
 {
@@ -29,18 +30,26 @@ class StorePersonRequest extends FormRequest
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
-    
+
     public function rules(): array
     {
-        
+
         return [
             'name' => ['required', 'string', 'max:255'],
-            'cpf' => ['required', new ValidCpf(), 'unique:people,cpf'],
+            'cpf' => [
+                'required',
+                new ValidCpf(),
+                Rule::unique('people', 'cpf')->ignore($this->route('person')),
+            ],
             'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', 'in:Feminino,Masculino,Outro'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:people,email'],
-
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('people', 'email')->ignore($this->route('person')),
+            ],
             'cep' => ['nullable', 'digits:8'],
             'street' => ['nullable', 'string', 'max:255'],
             'number' => ['nullable', 'string', 'max:20'],

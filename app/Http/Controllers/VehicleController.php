@@ -29,7 +29,7 @@ class VehicleController extends Controller
      * Show the form for creating a new resource.
      */
     public function create(): Response
-    {   
+    {
         return Inertia::render('vehicles/Create', [
             'people' => Person::query()
                 ->orderBy('name')
@@ -56,27 +56,31 @@ class VehicleController extends Controller
         //
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function edit(Vehicle $vehicle): Response
     {
-        //
+        return Inertia::render('vehicles/Edit', [
+            'vehicle' => $vehicle,
+            'people' => Person::query()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+        ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
+    public function update(
+        StoreVehicleRequest $request,
+        Vehicle $vehicle
+    ): RedirectResponse {
+        $vehicle->update($request->validated());
+
+        return to_route('vehicles.index')
+            ->with('success', 'Veículo atualizado com sucesso.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Vehicle $vehicle): RedirectResponse
     {
-        //
+        $vehicle->delete();
+
+        return to_route('vehicles.index')
+            ->with('success', 'Veículo excluído com sucesso.');
     }
 }

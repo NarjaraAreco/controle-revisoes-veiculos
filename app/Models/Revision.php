@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Revision extends Model
 {
     protected $fillable = [
-    'vehicle_id',
-    'revision_date',
-    'mileage',
-    'description',
-    'cost',
-    'next_revision_date',
+        'vehicle_id',
+        'maintenance_type',
+        'revision_date',
+        'mileage',
+        'description',
+        'cost',
+        'next_revision_date',
     ];
 
     protected function casts(): array

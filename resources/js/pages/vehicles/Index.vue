@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 
@@ -19,6 +19,16 @@ defineProps<{
     vehicles: Vehicle[];
 }>();
 
+const deleteForm = useForm({});
+
+function deleteVehicle(id: number) {
+    if (!window.confirm('Deseja realmente excluir este veículo?')) {
+        return;
+    }
+
+    deleteForm.delete(`/vehicles/${id}`);
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Veículos',
@@ -28,6 +38,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 </script>
 
 <template>
+
     <Head title="Veículos" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
@@ -40,10 +51,7 @@ const breadcrumbs: BreadcrumbItem[] = [
                     </p>
                 </div>
 
-                <Link
-                    href="/vehicles/create"
-                    class="rounded-md bg-primary px-4 py-2 text-primary-foreground"
-                >
+                <Link href="/vehicles/create" class="rounded-md bg-primary px-4 py-2 text-primary-foreground">
                     Novo veículo
                 </Link>
             </div>
@@ -62,15 +70,12 @@ const breadcrumbs: BreadcrumbItem[] = [
                             <th class="px-4 py-3">Ano</th>
                             <th class="px-4 py-3">Cor</th>
                             <th class="px-4 py-3">Proprietário</th>
+                            <th class="px-4 py-3">Ações</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        <tr
-                            v-for="vehicle in vehicles"
-                            :key="vehicle.id"
-                            class="border-b last:border-0"
-                        >
+                        <tr v-for="vehicle in vehicles" :key="vehicle.id" class="border-b last:border-0">
                             <td class="px-4 py-3">{{ vehicle.plate }}</td>
                             <td class="px-4 py-3">{{ vehicle.brand }}</td>
                             <td class="px-4 py-3">{{ vehicle.model }}</td>
@@ -82,6 +87,20 @@ const breadcrumbs: BreadcrumbItem[] = [
                                 {{
                                     vehicle.person?.name || 'Não informado'
                                 }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex gap-2">
+                                    <Link :href="`/vehicles/${vehicle.id}/edit`"
+                                        class="cursor-pointer rounded-md border px-3 py-1">
+                                        Editar
+                                    </Link>
+
+                                    <button type="button" :disabled="deleteForm.processing"
+                                        class="cursor-pointer rounded-md border border-red-500 px-3 py-1 text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                        @click="deleteVehicle(vehicle.id)">
+                                        Excluir
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>

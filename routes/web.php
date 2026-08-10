@@ -5,6 +5,7 @@ use App\Http\Controllers\PersonController;
 use App\Http\Controllers\VehicleController;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use App\Http\Controllers\RevisionController;
 
 Route::inertia('/', 'Welcome')->name('home');
 
@@ -48,6 +49,7 @@ Route::get('people', [PersonController::class, 'index'])
 
 require __DIR__.'/settings.php';
 
+// -------------------------------------- PESSOA----------------
 Route::get('people/create', [PersonController::class, 'create'])
     ->middleware(['auth'])
     ->name('people.create');
@@ -55,6 +57,20 @@ Route::get('people/create', [PersonController::class, 'create'])
 Route::post('people', [PersonController::class, 'store'])
     ->middleware(['auth'])
     ->name('people.store');
+
+Route::get('people/{person}/edit', [PersonController::class, 'edit'])
+    ->middleware(['auth'])
+    ->name('people.edit');
+
+Route::put('people/{person}', [PersonController::class, 'update'])
+    ->middleware(['auth'])
+    ->name('people.update');
+
+Route::delete('people/{person}', [PersonController::class, 'destroy'])
+    ->middleware(['auth'])
+    ->name('people.destroy');
+
+// ---------------------------------------------------------- VEICULOS
 
 Route::get('vehicles', [VehicleController::class, 'index'])
     ->middleware(['auth'])
@@ -67,6 +83,18 @@ Route::get('vehicles/create', [VehicleController::class, 'create'])
 Route::post('vehicles', [VehicleController::class, 'store'])
     ->middleware(['auth'])
     ->name('vehicles.store');
+
+Route::get('vehicles/{vehicle}/edit', [VehicleController::class, 'edit'])
+    ->middleware(['auth'])
+    ->name('vehicles.edit');
+
+Route::put('vehicles/{vehicle}', [VehicleController::class, 'update'])
+    ->middleware(['auth'])
+    ->name('vehicles.update');
+
+Route::delete('vehicles/{vehicle}', [VehicleController::class, 'destroy'])
+    ->middleware(['auth'])
+    ->name('vehicles.destroy');
 
 Route::get('api/brands', function () {
     $brands = Cache::remember(
@@ -127,3 +155,29 @@ Route::get('api/brands/{brand}/models', function (string $brand) {
 
     return response()->json($models);
 })->whereNumber('brand');
+
+//-----------------------------------------------------------------------------------
+
+Route::get('revisions', [RevisionController::class, 'index'])
+    ->middleware(['auth'])
+    ->name('revisions.index');
+
+Route::get('revisions/create', [RevisionController::class, 'create'])
+    ->middleware(['auth'])
+    ->name('revisions.create');
+
+Route::post('revisions', [RevisionController::class, 'store'])
+    ->middleware(['auth'])
+    ->name('revisions.store');
+
+Route::get('revisions/{revision}/edit', [RevisionController::class, 'edit'])
+    ->middleware(['auth'])
+    ->name('revisions.edit');
+
+Route::put('revisions/{revision}', [RevisionController::class, 'update'])
+    ->middleware(['auth'])
+    ->name('revisions.update');
+
+Route::delete('revisions/{revision}', [RevisionController::class, 'destroy'])
+    ->middleware(['auth'])
+    ->name('revisions.destroy');

@@ -50,27 +50,28 @@ class PersonController extends Controller
         //
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function edit(Person $person): Response
     {
-        //
+        return Inertia::render('people/Edit', [
+            'person' => $person,
+        ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
+    public function update(
+        StorePersonRequest $request,
+        Person $person
+    ): RedirectResponse {
+        $person->update($request->validated());
+
+        return to_route('people.index')
+            ->with('success', 'Pessoa atualizada com sucesso.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Person $person): RedirectResponse
     {
-        //
+        $person->delete();
+
+        return to_route('people.index')
+            ->with('success', 'Pessoa excluída com sucesso.');
     }
 }

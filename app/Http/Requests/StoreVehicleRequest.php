@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreVehicleRequest extends FormRequest
 {
@@ -39,7 +40,7 @@ class StoreVehicleRequest extends FormRequest
                 'string',
                 'size:7',
                 'regex:/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/',
-                'unique:vehicles,plate',
+                Rule::unique('vehicles', 'plate')->ignore($this->route('vehicle')),
             ],
 
             'brand' => [
