@@ -23,9 +23,9 @@ interface VehicleModel {
     id: string;
     name: string;
 }
-
-const { people } = defineProps<{
+const { people, selectedPersonId } = defineProps<{
     people: Person[];
+    selectedPersonId: number | null;
 }>();
 
 const maxYear = new Date().getFullYear() + 1;
@@ -52,7 +52,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const form = useForm({
-    person_id: '',
+    person_id: selectedPersonId ? String(selectedPersonId) : '',
     plate: '',
     brand: '',
     model: '',

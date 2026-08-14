@@ -84,13 +84,17 @@ const breadcrumbs: BreadcrumbItem[] = [
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex gap-2">
-                                    <Link :href="`/people/${person.id}/edit`"
-                                        class="cursor-pointer rounded-md border px-3 py-1">
+                                    <Link :href="`/vehicles/create?person_id=${person.id}`"
+                                        class="rounded-md border px-3 py-1">
+                                        Novo veículo
+                                    </Link>
+
+                                    <Link :href="`/people/${person.id}/edit`" class="rounded-md border px-3 py-1">
                                         Editar
                                     </Link>
 
                                     <button type="button" :disabled="deleteForm.processing"
-                                        class="cursor-pointer rounded-md border border-red-500 px-3 py-1 text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                        class="rounded-md border border-red-500 px-3 py-1 text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                                         @click="deletePerson(person.id)">
                                         Excluir
                                     </button>

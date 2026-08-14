@@ -28,12 +28,14 @@ class VehicleController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
         return Inertia::render('vehicles/Create', [
             'people' => Person::query()
                 ->orderBy('name')
                 ->get(['id', 'name']),
+
+            'selectedPersonId' => $request->integer('person_id') ?: null,
         ]);
     }
 
