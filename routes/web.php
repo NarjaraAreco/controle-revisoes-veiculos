@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use App\Http\Controllers\RevisionController;
 
-Route::inertia('/', 'Welcome')->name('home');
+Route::redirect('/', '/login')->name('home');
 
 Route::get('api/colors', function () {
     return response()->json([
@@ -43,13 +43,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 });
 
+// -------------------------------------- PESSOA----------------
+
 Route::get('people', [PersonController::class, 'index'])
     ->middleware(['auth'])
     ->name('people.index');
 
 require __DIR__.'/settings.php';
 
-// -------------------------------------- PESSOA----------------
 Route::get('people/create', [PersonController::class, 'create'])
     ->middleware(['auth'])
     ->name('people.create');

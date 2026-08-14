@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 /* @chisel-registration */
-import { register } from '@/routes';
+//import { register } from '@/routes';
 /* @end-chisel-registration */
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
@@ -19,8 +19,8 @@ import PasskeyVerify from '@/components/PasskeyVerify.vue';
 
 defineOptions({
     layout: {
-        title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
+        title: 'Entre na sua conta',
+        description: 'Coloque seu e-mail e senha',
     },
 });
 
@@ -31,7 +31,7 @@ defineProps<{
 </script>
 
 <template>
-    <Head title="Log in" />
+    <Head title="Login" />
 
     <div
         v-if="status"
@@ -52,7 +52,7 @@ defineProps<{
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">Email:</Label>
                 <Input
                     id="email"
                     type="email"
@@ -68,14 +68,14 @@ defineProps<{
 
             <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                    <Label for="password">Password</Label>
+                    <Label for="password">Senha: </Label>
                     <TextLink
                         v-if="canResetPassword"
                         :href="request()"
                         class="text-sm"
                         :tabindex="5"
                     >
-                        Forgot your password?
+                        Esqueceu sua senha?
                     </TextLink>
                 </div>
                 <PasswordInput
@@ -92,7 +92,7 @@ defineProps<{
             <div class="flex items-center justify-between">
                 <Label for="remember" class="flex items-center space-x-3">
                     <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span>Remember me</span>
+                    <span>Lembrar login</span>
                 </Label>
             </div>
 
@@ -104,15 +104,8 @@ defineProps<{
                 data-test="login-button"
             >
                 <Spinner v-if="processing" />
-                Log in
+                Entrar
             </Button>
         </div>
-
-        <!-- @chisel-registration -->
-        <div class="text-center text-sm text-muted-foreground">
-            Don't have an account?
-            <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
-        </div>
-        <!-- @end-chisel-registration -->
     </Form>
 </template>
