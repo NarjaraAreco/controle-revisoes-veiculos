@@ -248,7 +248,18 @@ onMounted(() => {
                         {{ form.errors.model }}
                     </p>
                 </div>
+                <div>
+                    <label for="year" class="mb-2 block text-sm font-medium">
+                        Ano
+                    </label>
 
+                    <input id="year" v-model="form.year" type="number" required min="1900" :max="maxYear"
+                        class="w-full rounded-md border bg-background px-3 py-2" />
+
+                    <p v-if="form.errors.year" class="mt-1 text-sm text-red-500">
+                        {{ form.errors.year }}
+                    </p>
+                </div>
                 <div>
                     <label for="color" class="mb-2 block text-sm font-medium">
                         Cor
