@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use App\Http\Controllers\RevisionController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\DashboardController;
 
 Route::redirect('/', '/login')->name('home');
 
@@ -41,7 +42,7 @@ Route::get('api/colors', function () {
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
 });
 
 Route::get('reports', [ReportController::class, 'index'])

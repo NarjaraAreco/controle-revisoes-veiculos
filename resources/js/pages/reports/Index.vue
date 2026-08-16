@@ -22,6 +22,18 @@ interface PersonWithVehicles {
     vehicles_count: number;
 }
 
+interface PersonReport {
+    id: number;
+    name: string;
+    cpf: string;
+    birth_date: string | null;
+    gender: string | null;
+    email: string | null;
+    phone: string | null;
+    city: string | null;
+    state: string | null;
+}
+
 interface Vehicle {
     id: number;
     plate: string;
@@ -74,10 +86,22 @@ interface PersonByRevisionCount {
     total: number | string;
 }
 
+interface AverageRevisionInterval {
+    person_id: number;
+    name: string;
+    average_days: number | string;
+}
+
+interface NextRevision {
+    person_id: number;
+    name: string;
+    last_revision_date: string;
+    average_days: number | string;
+    next_revision_date: string;
+}
+
 const {
-    totalPeople,
-    totalVehicles,
-    totalRevisions,
+    allPeople,
     peopleByGender,
     vehiclesByBrand,
     peopleWithVehicles,
@@ -88,10 +112,10 @@ const {
     revisionFilters,
     revisionsByBrand,
     peopleByRevisionCount,
+    averageRevisionIntervals,
+    nextRevisions,
 } = defineProps<{
-    totalPeople: number;
-    totalVehicles: number;
-    totalRevisions: number;
+    allPeople: PersonReport[];
     peopleByGender: PersonByGender[];
     vehiclesByBrand: VehicleByBrand[];
     peopleWithVehicles: PersonWithVehicles[];
@@ -102,6 +126,8 @@ const {
     revisionFilters: RevisionFilters;
     revisionsByBrand: VehicleByBrand[];
     peopleByRevisionCount: PersonByRevisionCount[];
+    averageRevisionIntervals: AverageRevisionInterval[];
+    nextRevisions: NextRevision[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -198,6 +224,11 @@ const maxPeopleByRevisionCount = Math.max(
     1,
 );
 
+const maxAverageRevisionInterval = Math.max(
+    ...averageRevisionIntervals.map((item) => Number(item.average_days)),
+    1,
+);
+
 </script>
 
 <template>
@@ -213,6 +244,13 @@ const maxPeopleByRevisionCount = Math.max(
                     Consulte os principais indicadores do sistema.
                 </p>
             </div>
+            <section class="space-y-4">
+                <div class="border-b pb-2">
+                    <h2 class="text-xl font-semibold">Revisões</h2>
+                    <p class="text-sm text-muted-foreground">
+                        Consulte as revisões por período, marca e pessoa.
+                    </p>
+                </div>
             <form class="grid gap-4 rounded-xl border p-5 md:grid-cols-3" @submit.prevent="filterRevisions">
                 <div>
                     <label for="start_date" class="mb-2 block text-sm font-medium">
@@ -363,29 +401,92 @@ const maxPeopleByRevisionCount = Math.max(
                     Nenhuma pessoa possui revisões no período.
                 </p>
             </section>
-            <div class="grid gap-4 md:grid-cols-4">
-                <div class="rounded-xl border p-5">
-                    <p class="text-sm text-muted-foreground">Pessoas</p>
-                    <p class="mt-2 text-3xl font-semibold">
-                        {{ totalPeople }}
+            <section class="rounded-xl border">
+                <div class="border-b p-5">
+                    <h2 class="font-semibold">
+                        Média de tempo entre revisões
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Intervalo médio entre revisões consecutivas da mesma pessoa.
                     </p>
                 </div>
 
-                <div class="rounded-xl border p-5">
-                    <p class="text-sm text-muted-foreground">Veículos</p>
-                    <p class="mt-2 text-3xl font-semibold">
-                        {{ totalVehicles }}
+                <div v-if="averageRevisionIntervals.length > 0" class="space-y-5 p-5">
+                    <div v-for="item in averageRevisionIntervals" :key="item.person_id">
+                        <div class="mb-1 flex justify-between text-sm">
+                            <span>{{ item.name }}</span>
+                            <span>{{ Number(item.average_days).toFixed(1) }} dias</span>
+                        </div>
+
+                        <div class="h-3 overflow-hidden rounded-full bg-muted">
+                            <div
+                                class="h-full rounded-full bg-primary transition-all"
+                                :style="{
+                                    width: `${(Number(item.average_days) / maxAverageRevisionInterval) * 100}%`,
+                                }"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+
+                <p v-else class="p-5 text-muted-foreground">
+                    Não há pessoas com duas ou mais revisões no período.
+                </p>
+            </section>
+            <section class="rounded-xl border">
+                <div class="border-b p-5">
+                    <h2 class="font-semibold">
+                        Próximas revisões previstas
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Previsão baseada na média de intervalo e na última revisão.
                     </p>
                 </div>
 
-                <div class="rounded-xl border p-5">
-                    <p class="text-sm text-muted-foreground">Revisões</p>
-                    <p class="mt-2 text-3xl font-semibold">
-                        {{ totalRevisions }}
+                <div v-if="nextRevisions.length > 0" class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="border-b bg-muted/50">
+                            <tr>
+                                <th class="px-5 py-3">Pessoa</th>
+                                <th class="px-5 py-3">Última revisão</th>
+                                <th class="px-5 py-3">Média</th>
+                                <th class="px-5 py-3">Próxima revisão prevista</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr
+                                v-for="item in nextRevisions"
+                                :key="item.person_id"
+                                class="border-b last:border-0"
+                            >
+                                <td class="px-5 py-3">{{ item.name }}</td>
+                                <td class="px-5 py-3">
+                                    {{ formatDate(item.last_revision_date) }}
+                                </td>
+                                <td class="px-5 py-3">
+                                    {{ Number(item.average_days).toFixed(1) }} dias
+                                </td>
+                                <td class="px-5 py-3 font-semibold">
+                                    {{ formatDate(item.next_revision_date) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p v-else class="p-5 text-muted-foreground">
+                    Não há dados suficientes para prever próximas revisões.
+                </p>
+            </section>
+            </section>
+            <section class="space-y-4">
+                <div class="border-b pb-2">
+                    <h2 class="text-xl font-semibold">Indicadores de veículos e pessoas</h2>
+                    <p class="text-sm text-muted-foreground">
+                        Comparativo geral entre proprietários, veículos e marcas.
                     </p>
                 </div>
-            </div>
-
             <div class="grid gap-6 lg:grid-cols-2">
                 <section class="rounded-xl border">
                     <div class="border-b p-5">
@@ -478,6 +579,67 @@ const maxPeopleByRevisionCount = Math.max(
                     </div>
                 </section>
             </div>
+            </section>
+            <section class="space-y-4">
+                <div class="border-b pb-2">
+                    <h2 class="text-xl font-semibold">Pessoas</h2>
+                    <p class="text-sm text-muted-foreground">
+                        Indicadores relacionados aos proprietários cadastrados.
+                    </p>
+                </div>
+            <section class="rounded-xl border">
+                <div class="border-b p-5">
+                    <h2 class="font-semibold">Todas as pessoas</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Pessoas cadastradas em ordem alfabética.
+                    </p>
+                </div>
+
+                <p v-if="allPeople.length === 0" class="p-5 text-muted-foreground">
+                    Nenhuma pessoa cadastrada.
+                </p>
+
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="border-b bg-muted/50">
+                            <tr>
+                                <th class="px-5 py-3">Nome</th>
+                                <th class="px-5 py-3">CPF</th>
+                                <th class="px-5 py-3">Gênero</th>
+                                <th class="px-5 py-3">Nascimento</th>
+                                <th class="px-5 py-3">Contato</th>
+                                <th class="px-5 py-3">Cidade/UF</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr
+                                v-for="person in allPeople"
+                                :key="person.id"
+                                class="border-b last:border-0"
+                            >
+                                <td class="px-5 py-3">{{ person.name }}</td>
+                                <td class="px-5 py-3">{{ person.cpf }}</td>
+                                <td class="px-5 py-3">
+                                    {{ person.gender ?? 'Não informado' }}
+                                </td>
+                                <td class="px-5 py-3">
+                                    {{ formatDate(person.birth_date) }}
+                                </td>
+                                <td class="px-5 py-3">
+                                    <div>{{ person.phone ?? 'Não informado' }}</div>
+                                    <div class="text-muted-foreground">
+                                        {{ person.email ?? 'Não informado' }}
+                                    </div>
+                                </td>
+                                <td class="px-5 py-3">
+                                    {{ person.city ? `${person.city}/${person.state ?? ''}` : 'Não informado' }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
             <section class="rounded-xl border">
                 <div class="border-b p-5">
                     <h2 class="font-semibold">
@@ -548,6 +710,14 @@ const maxPeopleByRevisionCount = Math.max(
                     Não existem dados suficientes para esse relatório.
                 </p>
             </section>
+            </section>
+            <section class="space-y-4">
+                <div class="border-b pb-2">
+                    <h2 class="text-xl font-semibold">Veículos</h2>
+                    <p class="text-sm text-muted-foreground">
+                        Informações sobre os veículos e suas marcas.
+                    </p>
+                </div>
             <section class="rounded-xl border">
                 <div class="border-b p-5">
                     <h2 class="font-semibold">Todos os veículos por pessoa</h2>
@@ -640,6 +810,7 @@ const maxPeopleByRevisionCount = Math.max(
                 <p v-else class="p-5 text-muted-foreground">
                     Não existem dados de marcas por gênero.
                 </p>
+            </section>
             </section>
         </div>
     </AppLayout>

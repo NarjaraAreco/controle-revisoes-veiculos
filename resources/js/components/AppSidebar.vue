@@ -68,7 +68,7 @@ const footerNavItems: NavItem[] = [
 </script>
 
 <template>
-    <Sidebar collapsible="icon" variant="inset">
+    <Sidebar collapsible="none" variant="sidebar" class="min-h-svh shrink-0">
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>
@@ -90,5 +90,4 @@ const footerNavItems: NavItem[] = [
             <NavUser />
         </SidebarFooter>
     </Sidebar>
-    <slot />
 </template>

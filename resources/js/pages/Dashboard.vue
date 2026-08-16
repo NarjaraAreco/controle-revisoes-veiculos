@@ -12,6 +12,12 @@ defineOptions({
     },
 });
 
+defineProps<{
+    totalPeople: number;
+    totalVehicles: number;
+    totalRevisions: number;
+}>();
+
 </script>
 
 <template>
@@ -25,8 +31,30 @@ defineOptions({
             </p>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-3">
-            <Link href="/people" clhass="rounded-xl border p-6 transition hover:bg-muted">
+        <div>
+            <h2 class="mb-3 text-lg font-semibold">Resumo geral</h2>
+            <div class="grid gap-4 md:grid-cols-3">
+                <div class="rounded-xl border p-5">
+                    <p class="text-sm text-muted-foreground">Pessoas</p>
+                    <p class="mt-2 text-3xl font-semibold">{{ totalPeople }}</p>
+                </div>
+
+                <div class="rounded-xl border p-5">
+                    <p class="text-sm text-muted-foreground">Veículos</p>
+                    <p class="mt-2 text-3xl font-semibold">{{ totalVehicles }}</p>
+                </div>
+
+                <div class="rounded-xl border p-5">
+                    <p class="text-sm text-muted-foreground">Revisões</p>
+                    <p class="mt-2 text-3xl font-semibold">{{ totalRevisions }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h2 class="mb-3 text-lg font-semibold">Módulos</h2>
+            <div class="grid gap-4 md:grid-cols-4">
+            <Link href="/people" class="rounded-xl border p-6 transition hover:bg-muted">
                 <h2 class="text-lg font-semibold">Pessoas</h2>
                 <p class="mt-2 text-sm text-muted-foreground">
                     Gerencie proprietários cadastrados.
@@ -46,6 +74,14 @@ defineOptions({
                     Acompanhe as revisões realizadas.
                 </p>
             </Link>
+
+            <Link href="/reports" class="rounded-xl border p-6 transition hover:bg-muted">
+                <h2 class="text-lg font-semibold">Relatórios</h2>
+                <p class="mt-2 text-sm text-muted-foreground">
+                    Consulte os indicadores e análises do sistema.
+                </p>
+            </Link>
+            </div>
         </div>
     </div>
 </template>

@@ -17,6 +17,9 @@ createInertiaApp({
                 return AuthLayout;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
+            case /^(people|vehicles|revisions|reports)\//.test(name):
+                // Estas páginas já possuem AppLayout no próprio template.
+                return null;
             default:
                 return AppLayout;
         }
