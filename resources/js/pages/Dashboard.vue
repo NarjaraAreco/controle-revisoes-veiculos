@@ -26,7 +26,7 @@ defineOptions({
         </div>
 
         <div class="grid gap-4 md:grid-cols-3">
-            <Link href="/people" class="rounded-xl border p-6 transition hover:bg-muted">
+            <Link href="/people" clhass="rounded-xl border p-6 transition hover:bg-muted">
                 <h2 class="text-lg font-semibold">Pessoas</h2>
                 <p class="mt-2 text-sm text-muted-foreground">
                     Gerencie proprietários cadastrados.

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { reactive } from 'vue';
 
 interface VehicleByBrand {
     brand: string;
@@ -43,6 +44,36 @@ interface BrandByGender {
     total: number | string;
 }
 
+interface RevisionReport {
+    id: number;
+    maintenance_type: string;
+    revision_date: string;
+    mileage: number;
+    description: string;
+    cost: number | string | null;
+    next_revision_date: string | null;
+    vehicle: {
+        plate: string;
+        brand: string;
+        model: string;
+        person: {
+            name: string;
+        } | null;
+    };
+}
+
+interface RevisionFilters {
+    start_date: string | null;
+    end_date: string | null;
+}
+
+interface PersonByRevisionCount {
+    id: number;
+    name: string;
+    gender: string | null;
+    total: number | string;
+}
+
 const {
     totalPeople,
     totalVehicles,
@@ -53,6 +84,10 @@ const {
     vehiclesByPerson,
     peopleWithMostVehiclesByGender,
     brandsByGender,
+    revisionsInPeriod,
+    revisionFilters,
+    revisionsByBrand,
+    peopleByRevisionCount,
 } = defineProps<{
     totalPeople: number;
     totalVehicles: number;
@@ -63,6 +98,10 @@ const {
     vehiclesByPerson: VehiclesByPerson[];
     peopleWithMostVehiclesByGender: PersonWithVehicles[];
     brandsByGender: BrandByGender[];
+    revisionsInPeriod: RevisionReport[];
+    revisionFilters: RevisionFilters;
+    revisionsByBrand: VehicleByBrand[];
+    peopleByRevisionCount: PersonByRevisionCount[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -71,7 +110,53 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/reports',
     },
 ];
-//GRAFICOS
+
+const revisionFilterForm = reactive({
+    start_date: revisionFilters.start_date ?? '',
+    end_date: revisionFilters.end_date ?? '',
+});
+
+function filterRevisions() {
+    router.get('/reports', revisionFilterForm, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
+
+function clearRevisionFilters() {
+    revisionFilterForm.start_date = '';
+    revisionFilterForm.end_date = '';
+
+    filterRevisions();
+}
+
+function formatDate(date: string | null) {
+    if (!date) {
+        return 'Não informado';
+    }
+
+    const [year, month, day] = date.substring(0, 10).split('-');
+
+    return `${day}/${month}/${year}`;
+}
+
+function formatMaintenanceType(type: string) {
+    return type === 'preventive' ? 'Preventiva' : 'Corretiva';
+}
+
+function formatCost(cost: number | string | null) {
+    if (cost === null || cost === '') {
+        return 'Não informado';
+    }
+
+    return Number(cost).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+    });
+}
+
+//GRAFICOS ------ BARRA
 const maxVehiclesByBrand = Math.max(
     ...vehiclesByBrand.map((item) => Number(item.total)),
     1,
@@ -103,6 +188,16 @@ const maxBrandsByGender = Math.max(
     1,
 );
 
+const maxRevisionsByBrand = Math.max(
+    ...revisionsByBrand.map((item) => Number(item.total)),
+    1,
+);
+
+const maxPeopleByRevisionCount = Math.max(
+    ...peopleByRevisionCount.map((item) => Number(item.total)),
+    1,
+);
+
 </script>
 
 <template>
@@ -118,7 +213,156 @@ const maxBrandsByGender = Math.max(
                     Consulte os principais indicadores do sistema.
                 </p>
             </div>
+            <form class="grid gap-4 rounded-xl border p-5 md:grid-cols-3" @submit.prevent="filterRevisions">
+                <div>
+                    <label for="start_date" class="mb-2 block text-sm font-medium">
+                        Data inicial
+                    </label>
 
+                    <input id="start_date" v-model="revisionFilterForm.start_date" type="date"
+                        class="w-full rounded-md border bg-background px-3 py-2" />
+                </div>
+
+                <div>
+                    <label for="end_date" class="mb-2 block text-sm font-medium">
+                        Data final
+                    </label>
+
+                    <input id="end_date" v-model="revisionFilterForm.end_date" type="date"
+                        class="w-full rounded-md border bg-background px-3 py-2" />
+                </div>
+
+                <div class="flex items-end gap-3">
+                    <button type="submit" class="rounded-md bg-primary px-4 py-2 text-primary-foreground">
+                        Filtrar
+                    </button>
+
+                    <button type="button" class="rounded-md border px-4 py-2" @click="clearRevisionFilters">
+                        Limpar
+                    </button>
+                </div>
+            </form>
+            <section class="rounded-xl border">
+                <div class="flex items-center justify-between border-b p-5">
+                    <div>
+                        <h2 class="font-semibold">
+                            Revisões no período
+                        </h2>
+
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            {{ revisionsInPeriod.length }} revisão(ões) encontrada(s).
+                        </p>
+                    </div>
+                </div>
+
+                <p v-if="revisionsInPeriod.length === 0" class="p-5 text-muted-foreground">
+                    Nenhuma revisão encontrada para o período informado.
+                </p>
+
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="border-b bg-muted/50">
+                            <tr>
+                                <th class="px-5 py-3">Data</th>
+                                <th class="px-5 py-3">Pessoa</th>
+                                <th class="px-5 py-3">Veículo</th>
+                                <th class="px-5 py-3">Tipo</th>
+                                <th class="px-5 py-3">Quilometragem</th>
+                                <th class="px-5 py-3">Custo</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr v-for="revision in revisionsInPeriod" :key="revision.id" class="border-b last:border-0">
+                                <td class="px-5 py-3">
+                                    {{ formatDate(revision.revision_date) }}
+                                </td>
+
+                                <td class="px-5 py-3">
+                                    {{ revision.vehicle.person?.name ?? 'Não informado' }}
+                                </td>
+
+                                <td class="px-5 py-3">
+                                    {{ revision.vehicle.plate }}
+                                    -
+                                    {{ revision.vehicle.brand }}
+                                    {{ revision.vehicle.model }}
+                                </td>
+
+                                <td class="px-5 py-3">
+                                    {{ formatMaintenanceType(revision.maintenance_type) }}
+                                </td>
+
+                                <td class="px-5 py-3">
+                                    {{ revision.mileage.toLocaleString('pt-BR') }} km
+                                </td>
+
+                                <td class="px-5 py-3">
+                                    {{ formatCost(revision.cost) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="rounded-xl border">
+                <div class="border-b p-5">
+                    <h2 class="font-semibold">
+                        Marcas com mais revisões
+                    </h2>
+                </div>
+
+                <div v-if="revisionsByBrand.length > 0" class="space-y-5 p-5">
+                    <div v-for="item in revisionsByBrand" :key="item.brand">
+                        <div class="mb-1 flex justify-between text-sm">
+                            <span>{{ item.brand }}</span>
+                            <span>{{ item.total }}</span>
+                        </div>
+
+                        <div class="h-3 overflow-hidden rounded-full bg-muted">
+                            <div class="h-full rounded-full bg-primary transition-all" :style="{
+                                width: `${(Number(item.total) / maxRevisionsByBrand) * 100}%`,
+                            }"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <p v-else class="p-5 text-muted-foreground">
+                    Nenhuma revisão encontrada no período.
+                </p>
+            </section>
+            <section class="rounded-xl border">
+                <div class="border-b p-5">
+                    <h2 class="font-semibold">
+                        Pessoas com mais revisões
+                    </h2>
+                </div>
+
+                <div v-if="peopleByRevisionCount.length > 0" class="space-y-5 p-5">
+                    <div v-for="person in peopleByRevisionCount" :key="person.id">
+                        <div class="mb-1 flex justify-between text-sm">
+                            <span>
+                                {{ person.name }}
+                                <span v-if="person.gender" class="text-muted-foreground">
+                                    ({{ person.gender }})
+                                </span>
+                            </span>
+
+                            <span>{{ person.total }}</span>
+                        </div>
+
+                        <div class="h-3 overflow-hidden rounded-full bg-muted">
+                            <div class="h-full rounded-full bg-primary transition-all" :style="{
+                                width: `${(Number(person.total) / maxPeopleByRevisionCount) * 100}%`,
+                            }"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <p v-else class="p-5 text-muted-foreground">
+                    Nenhuma pessoa possui revisões no período.
+                </p>
+            </section>
             <div class="grid gap-4 md:grid-cols-4">
                 <div class="rounded-xl border p-5">
                     <p class="text-sm text-muted-foreground">Pessoas</p>
