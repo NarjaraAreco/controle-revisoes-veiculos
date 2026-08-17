@@ -2,7 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 
 interface VehicleByBrand {
     brand: string;
@@ -34,6 +34,11 @@ interface PersonReport {
     state: string | null;
 }
 
+interface CityReport {
+    city: string;
+    total: number | string;
+}
+
 interface Vehicle {
     id: number;
     plate: string;
@@ -41,6 +46,23 @@ interface Vehicle {
     model: string;
     year: number;
     color: string | null;
+}
+
+interface VehicleReport {
+    id: number;
+    plate: string;
+    brand: string;
+    model: string;
+    year: number;
+    color: string | null;
+    person: {
+        name: string;
+    } | null;
+}
+
+interface YearReport {
+    year: number;
+    total: number | string;
 }
 
 interface VehiclesByPerson {
@@ -79,6 +101,11 @@ interface RevisionFilters {
     end_date: string | null;
 }
 
+interface RevisionByMonth {
+    month: string;
+    total: number;
+}
+
 interface PersonByRevisionCount {
     id: number;
     name: string;
@@ -102,13 +129,17 @@ interface NextRevision {
 
 const {
     allPeople,
+    peopleByCity,
     peopleByGender,
     vehiclesByBrand,
     peopleWithVehicles,
     vehiclesByPerson,
+    allVehicles,
+    vehiclesByYear,
     peopleWithMostVehiclesByGender,
     brandsByGender,
     revisionsInPeriod,
+    revisionsByMonth,
     revisionFilters,
     revisionsByBrand,
     peopleByRevisionCount,
@@ -116,13 +147,17 @@ const {
     nextRevisions,
 } = defineProps<{
     allPeople: PersonReport[];
+    peopleByCity: CityReport[];
     peopleByGender: PersonByGender[];
     vehiclesByBrand: VehicleByBrand[];
     peopleWithVehicles: PersonWithVehicles[];
     vehiclesByPerson: VehiclesByPerson[];
+    allVehicles: VehicleReport[];
+    vehiclesByYear: YearReport[];
     peopleWithMostVehiclesByGender: PersonWithVehicles[];
     brandsByGender: BrandByGender[];
     revisionsInPeriod: RevisionReport[];
+    revisionsByMonth: RevisionByMonth[];
     revisionFilters: RevisionFilters;
     revisionsByBrand: VehicleByBrand[];
     peopleByRevisionCount: PersonByRevisionCount[];
@@ -229,6 +264,47 @@ const maxAverageRevisionInterval = Math.max(
     1,
 );
 
+const maxPeopleByCity = computed(() => Math.max(
+    1,
+    ...peopleByCity.map((item) => Number(item.total)),
+));
+
+const maxVehiclesByYear = computed(() => Math.max(
+    1,
+    ...vehiclesByYear.map((item) => Number(item.total)),
+));
+
+const maxRevisionsByMonth = computed(() => Math.max(
+    1,
+    ...revisionsByMonth.map((item) => Number(item.total)),
+));
+
+const maxNextRevisionDays = computed(() => Math.max(
+    1,
+    ...nextRevisions.map((item) => daysUntil(item.next_revision_date)),
+));
+
+function daysUntil(date: string): number {
+    const today = new Date();
+    const target = new Date(`${date.substring(0, 10)}T00:00:00`);
+    const difference = target.getTime() - new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+    ).getTime();
+
+    return Math.max(0, Math.ceil(difference / 86400000));
+}
+
+function formatMonth(month: string): string {
+    const [year, monthNumber] = month.split('-').map(Number);
+
+    return new Intl.DateTimeFormat('pt-BR', {
+        month: 'short',
+        year: '2-digit',
+    }).format(new Date(year, monthNumber - 1, 1));
+}
+
 </script>
 
 <template>
@@ -244,6 +320,11 @@ const maxAverageRevisionInterval = Math.max(
                     Consulte os principais indicadores do sistema.
                 </p>
             </div>
+            <details open class="group space-y-4">
+                <summary class="flex cursor-pointer list-none items-center justify-between rounded-xl border p-4 font-semibold">
+                    <span>Revisões</span>
+                    <span class="text-xl transition-transform group-open:rotate-90">&gt;</span>
+                </summary>
             <section class="space-y-4">
                 <div class="border-b pb-2">
                     <h2 class="text-xl font-semibold">Revisões</h2>
@@ -290,6 +371,28 @@ const maxAverageRevisionInterval = Math.max(
                         <p class="mt-1 text-sm text-muted-foreground">
                             {{ revisionsInPeriod.length }} revisão(ões) encontrada(s).
                         </p>
+                    </div>
+                </div>
+
+                <div v-if="revisionsByMonth.length" class="border-b p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="font-semibold">Revisões por mês</h3>
+                        <span class="text-xs text-muted-foreground">Quantidade</span>
+                    </div>
+
+                    <div class="flex h-48 items-end gap-3 overflow-x-auto border-b border-l px-4 pb-2 pt-6">
+                        <div
+                            v-for="item in revisionsByMonth"
+                            :key="item.month"
+                            class="flex min-w-16 flex-1 flex-col items-center justify-end gap-2"
+                        >
+                            <span class="text-sm font-semibold">{{ item.total }}</span>
+                            <div
+                                class="w-full max-w-12 rounded-t-md bg-primary"
+                                :style="{ height: `${(Number(item.total) / maxRevisionsByMonth) * 100}%`, minHeight: '6px' }"
+                            />
+                            <span class="text-xs text-muted-foreground">{{ formatMonth(item.month) }}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -443,6 +546,28 @@ const maxAverageRevisionInterval = Math.max(
                     </p>
                 </div>
 
+                <div v-if="nextRevisions.length > 0" class="border-b p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="font-semibold">Distância até a próxima revisão</h3>
+                        <span class="text-xs text-muted-foreground">Dias previstos</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div v-for="item in nextRevisions" :key="`chart-next-${item.person_id}`">
+                            <div class="mb-1 flex justify-between gap-4 text-sm">
+                                <span class="truncate">{{ item.name }}</span>
+                                <span>{{ daysUntil(item.next_revision_date) }} dias</span>
+                            </div>
+                            <div class="h-3 overflow-hidden rounded-full bg-muted">
+                                <div
+                                    class="h-full rounded-full bg-primary"
+                                    :style="{ width: `${(daysUntil(item.next_revision_date) / maxNextRevisionDays) * 100}%` }"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div v-if="nextRevisions.length > 0" class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="border-b bg-muted/50">
@@ -480,6 +605,12 @@ const maxAverageRevisionInterval = Math.max(
                 </p>
             </section>
             </section>
+            </details>
+            <details open class="group space-y-4">
+                <summary class="flex cursor-pointer list-none items-center justify-between rounded-xl border p-4 font-semibold">
+                    <span>Indicadores de veículos e pessoas</span>
+                    <span class="text-xl transition-transform group-open:rotate-90">&gt;</span>
+                </summary>
             <section class="space-y-4">
                 <div class="border-b pb-2">
                     <h2 class="text-xl font-semibold">Indicadores de veículos e pessoas</h2>
@@ -580,6 +711,12 @@ const maxAverageRevisionInterval = Math.max(
                 </section>
             </div>
             </section>
+            </details>
+            <details open class="group space-y-4">
+                <summary class="flex cursor-pointer list-none items-center justify-between rounded-xl border p-4 font-semibold">
+                    <span>Pessoas</span>
+                    <span class="text-xl transition-transform group-open:rotate-90">&gt;</span>
+                </summary>
             <section class="space-y-4">
                 <div class="border-b pb-2">
                     <h2 class="text-xl font-semibold">Pessoas</h2>
@@ -593,6 +730,28 @@ const maxAverageRevisionInterval = Math.max(
                     <p class="mt-1 text-sm text-muted-foreground">
                         Pessoas cadastradas em ordem alfabética.
                     </p>
+                </div>
+
+                <div v-if="peopleByCity.length" class="border-b p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="font-semibold">Pessoas por cidade</h3>
+                        <span class="text-xs text-muted-foreground">Quantidade</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div v-for="item in peopleByCity" :key="item.city">
+                            <div class="mb-1 flex justify-between gap-4 text-sm">
+                                <span class="truncate">{{ item.city }}</span>
+                                <span>{{ item.total }}</span>
+                            </div>
+                            <div class="h-3 overflow-hidden rounded-full bg-muted">
+                                <div
+                                    class="h-full rounded-full bg-primary"
+                                    :style="{ width: `${(Number(item.total) / maxPeopleByCity) * 100}%` }"
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <p v-if="allPeople.length === 0" class="p-5 text-muted-foreground">
@@ -711,6 +870,12 @@ const maxAverageRevisionInterval = Math.max(
                 </p>
             </section>
             </section>
+            </details>
+            <details open class="group space-y-4">
+                <summary class="flex cursor-pointer list-none items-center justify-between rounded-xl border p-4 font-semibold">
+                    <span>Veículos</span>
+                    <span class="text-xl transition-transform group-open:rotate-90">&gt;</span>
+                </summary>
             <section class="space-y-4">
                 <div class="border-b pb-2">
                     <h2 class="text-xl font-semibold">Veículos</h2>
@@ -718,6 +883,63 @@ const maxAverageRevisionInterval = Math.max(
                         Informações sobre os veículos e suas marcas.
                     </p>
                 </div>
+            <section class="rounded-xl border">
+                <div class="border-b p-5">
+                    <h2 class="font-semibold">Todos os veículos</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Lista completa dos veículos cadastrados no sistema.
+                    </p>
+                </div>
+
+                <div v-if="vehiclesByYear.length" class="border-b p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="font-semibold">Veículos por ano</h3>
+                        <span class="text-xs text-muted-foreground">Quantidade</span>
+                    </div>
+
+                    <div class="flex h-48 items-end gap-3 overflow-x-auto border-b border-l px-4 pb-2 pt-6">
+                        <div
+                            v-for="item in vehiclesByYear"
+                            :key="item.year"
+                            class="flex min-w-16 flex-1 flex-col items-center justify-end gap-2"
+                        >
+                            <span class="text-sm font-semibold">{{ item.total }}</span>
+                            <div
+                                class="w-full max-w-12 rounded-t-md bg-primary"
+                                :style="{ height: `${(Number(item.total) / maxVehiclesByYear) * 100}%`, minHeight: '6px' }"
+                            />
+                            <span class="text-xs text-muted-foreground">{{ item.year }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="allVehicles.length" class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="border-b bg-muted/50">
+                            <tr>
+                                <th class="px-5 py-3">Placa</th>
+                                <th class="px-5 py-3">Marca</th>
+                                <th class="px-5 py-3">Modelo</th>
+                                <th class="px-5 py-3">Ano</th>
+                                <th class="px-5 py-3">Proprietário</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="vehicle in allVehicles" :key="vehicle.id" class="border-b last:border-0">
+                                <td class="px-5 py-3">{{ vehicle.plate }}</td>
+                                <td class="px-5 py-3">{{ vehicle.brand }}</td>
+                                <td class="px-5 py-3">{{ vehicle.model }}</td>
+                                <td class="px-5 py-3">{{ vehicle.year }}</td>
+                                <td class="px-5 py-3">{{ vehicle.person?.name ?? 'Não informado' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p v-else class="p-5 text-muted-foreground">
+                    Nenhum veículo cadastrado.
+                </p>
+            </section>
             <section class="rounded-xl border">
                 <div class="border-b p-5">
                     <h2 class="font-semibold">Todos os veículos por pessoa</h2>
@@ -812,6 +1034,7 @@ const maxAverageRevisionInterval = Math.max(
                 </p>
             </section>
             </section>
+            </details>
         </div>
     </AppLayout>
 </template>

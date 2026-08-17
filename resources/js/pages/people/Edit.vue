@@ -175,6 +175,7 @@ function submit() {
                         id="birth_date"
                         v-model="form.birth_date"
                         type="date"
+                        required
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>
@@ -215,6 +216,7 @@ function submit() {
                         id="email"
                         v-model="form.email"
                         type="email"
+                        required
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>

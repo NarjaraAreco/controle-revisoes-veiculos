@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import {
     BookOpen,
     Car,
     ChartBar,
     FolderGit2,
     LayoutGrid,
+    UserRound,
     Users,
     Wrench,
 } from '@lucide/vue';
@@ -32,6 +34,11 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
+        title: 'Meu perfil',
+        href: '/settings/profile',
+        icon: UserRound,
+    },
+    {
         title: 'Relatórios',
         href: '/reports',
         icon: ChartBar,
@@ -53,18 +60,40 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
+const clientNavItems: NavItem[] = [
+    {
+        title: 'Dashboard',
+        href: dashboard(),
+        icon: LayoutGrid,
+    },
+    {
+        title: 'Meu perfil',
+        href: '/client/profile',
+        icon: UserRound,
+    },
+];
+
 const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
+        title: 'Repositório',
         href: 'https://github.com/laravel/vue-starter-kit',
         icon: FolderGit2,
     },
     {
-        title: 'Documentation',
+        title: 'Documentação',
         href: 'https://laravel.com/docs/starter-kits#vue',
         icon: BookOpen,
     },
 ];
+
+const page = usePage();
+const isAdmin = computed(() => page.props.auth.user?.role === 'admin');
+const isClient = computed(() => page.props.client !== null);
+const visibleMainNavItems = computed(() => isClient.value
+    ? clientNavItems
+    : isAdmin.value
+        ? mainNavItems
+        : mainNavItems.slice(0, 1));
 </script>
 
 <template>
@@ -82,12 +111,21 @@ const footerNavItems: NavItem[] = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain :items="visibleMainNavItems" />
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
-            <NavUser />
+            <NavFooter v-if="!isClient" :items="footerNavItems" />
+            <NavUser v-if="!isClient" />
+            <SidebarMenu v-else>
+                <SidebarMenuItem>
+                    <SidebarMenuButton as-child>
+                        <Link href="/client/logout" method="post" as="button">
+                            <span>Sair</span>
+                        </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
         </SidebarFooter>
     </Sidebar>
 </template>

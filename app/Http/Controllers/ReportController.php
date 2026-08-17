@@ -38,6 +38,16 @@ class ReportController extends Controller
                 'state',
             ]);
 
+        $peopleByCity = Person::query()
+            ->select('city')
+            ->selectRaw('COUNT(*) as total')
+            ->whereNotNull('city')
+            ->where('city', '!=', '')
+            ->groupBy('city')
+            ->orderByDesc('total')
+            ->orderBy('city')
+            ->get();
+
         $peopleByGender = Person::query()
             ->select('gender')
             ->selectRaw('COUNT(*) as total')
@@ -60,6 +70,19 @@ class ReportController extends Controller
             ->whereHas('vehicles')
             ->orderBy('name')
             ->get(['id', 'name', 'gender']);
+
+        $allVehicles = Vehicle::query()
+            ->with('person:id,name')
+            ->orderBy('brand')
+            ->orderBy('model')
+            ->get(['id', 'person_id', 'plate', 'brand', 'model', 'year', 'color']);
+
+        $vehiclesByYear = Vehicle::query()
+            ->select('year')
+            ->selectRaw('COUNT(*) as total')
+            ->groupBy('year')
+            ->orderBy('year')
+            ->get();
 
         $peopleWithMostVehiclesByGender = Person::query()
             ->withCount('vehicles')
@@ -102,6 +125,15 @@ class ReportController extends Controller
             })
             ->orderByDesc('revision_date')
             ->get();
+
+        $revisionsByMonth = $revisionsInPeriod
+            ->groupBy(fn ($revision) => $revision->revision_date->format('Y-m'))
+            ->map(fn ($revisions, $month) => [
+                'month' => $month,
+                'total' => $revisions->count(),
+            ])
+            ->sortKeys()
+            ->values();
 
         $averageRevisionIntervals = $revisionsInPeriod
             ->filter(fn ($revision) => $revision->vehicle?->person)
@@ -193,12 +225,16 @@ class ReportController extends Controller
         return Inertia::render('reports/Index', [
             'peopleByGender' => $peopleByGender,
             'allPeople' => $allPeople,
+            'peopleByCity' => $peopleByCity,
             'vehiclesByBrand' => $vehiclesByBrand,
             'peopleWithVehicles' => $peopleWithVehicles,
             'vehiclesByPerson' => $vehiclesByPerson,
+            'allVehicles' => $allVehicles,
+            'vehiclesByYear' => $vehiclesByYear,
             'peopleWithMostVehiclesByGender' => $peopleWithMostVehiclesByGender,
             'brandsByGender' => $brandsByGender,
             'revisionsInPeriod' => $revisionsInPeriod,
+            'revisionsByMonth' => $revisionsByMonth,
             'revisionFilters' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,

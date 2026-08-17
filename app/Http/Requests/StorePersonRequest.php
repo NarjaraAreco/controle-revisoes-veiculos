@@ -41,11 +41,11 @@ class StorePersonRequest extends FormRequest
                 new ValidCpf(),
                 Rule::unique('people', 'cpf')->ignore($this->route('person')),
             ],
-            'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'birth_date' => ['required', 'date', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', 'in:Feminino,Masculino,Outro'],
             'phone' => ['nullable', 'string', 'max:20'],
             'email' => [
-                'nullable',
+                'required',
                 'email',
                 'max:255',
                 Rule::unique('people', 'email')->ignore($this->route('person')),

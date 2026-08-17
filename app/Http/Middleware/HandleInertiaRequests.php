@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use App\Models\Person;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -41,6 +42,11 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'client' => $request->session()->has('client_person_id')
+                ? (Person::query()
+                    ->find($request->session()->get('client_person_id'))
+                    ?->only(['id', 'name', 'email']))
+                : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

@@ -8,8 +8,20 @@ use Illuminate\Support\Facades\Http;
 use App\Http\Controllers\RevisionController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ClientAuthController;
+use App\Http\Controllers\ClientProfileController;
 
 Route::redirect('/', '/login')->name('home');
+
+Route::post('client/login', [ClientAuthController::class, 'login'])
+    ->name('client.login');
+
+Route::post('client/logout', [ClientAuthController::class, 'logout'])
+    ->name('client.logout');
+
+Route::get('client/profile', ClientProfileController::class)
+    ->middleware('client')
+    ->name('client.profile');
 
 Route::get('api/colors', function () {
     return response()->json([
@@ -38,69 +50,69 @@ Route::get('api/colors', function () {
             'name' => 'Azul',
         ],
     ]);
-});
+})->middleware(['auth', 'admin']);
 
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', DashboardController::class)->name('dashboard');
-});
+Route::get('dashboard', DashboardController::class)
+    ->middleware('dashboard.access')
+    ->name('dashboard');
 
 Route::get('reports', [ReportController::class, 'index'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('reports.index');
 
 // -------------------------------------- PESSOA----------------
 
 Route::get('people', [PersonController::class, 'index'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('people.index');
 
 require __DIR__.'/settings.php';
 
 Route::get('people/create', [PersonController::class, 'create'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('people.create');
 
 Route::post('people', [PersonController::class, 'store'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('people.store');
 
 Route::get('people/{person}/edit', [PersonController::class, 'edit'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('people.edit');
 
 Route::put('people/{person}', [PersonController::class, 'update'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('people.update');
 
 Route::delete('people/{person}', [PersonController::class, 'destroy'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('people.destroy');
 
 // ---------------------------------------------------------- VEICULOS
 
 Route::get('vehicles', [VehicleController::class, 'index'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('vehicles.index');
 
 Route::get('vehicles/create', [VehicleController::class, 'create'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('vehicles.create');
 
 Route::post('vehicles', [VehicleController::class, 'store'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('vehicles.store');
 
 Route::get('vehicles/{vehicle}/edit', [VehicleController::class, 'edit'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('vehicles.edit');
 
 Route::put('vehicles/{vehicle}', [VehicleController::class, 'update'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('vehicles.update');
 
 Route::delete('vehicles/{vehicle}', [VehicleController::class, 'destroy'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('vehicles.destroy');
 
 Route::get('api/brands', function () {
@@ -130,7 +142,7 @@ Route::get('api/brands', function () {
     );
 
     return response()->json($brands);
-});
+})->middleware(['auth', 'admin']);
 
 Route::get('api/brands/{brand}/models', function (string $brand) {
     $models = Cache::remember(
@@ -161,30 +173,30 @@ Route::get('api/brands/{brand}/models', function (string $brand) {
     );
 
     return response()->json($models);
-})->whereNumber('brand');
+})->whereNumber('brand')->middleware(['auth', 'admin']);
 
 //-----------------------------------------------------------------------------------
 
 Route::get('revisions', [RevisionController::class, 'index'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('revisions.index');
 
 Route::get('revisions/create', [RevisionController::class, 'create'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('revisions.create');
 
 Route::post('revisions', [RevisionController::class, 'store'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('revisions.store');
 
 Route::get('revisions/{revision}/edit', [RevisionController::class, 'edit'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('revisions.edit');
 
 Route::put('revisions/{revision}', [RevisionController::class, 'update'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('revisions.update');
 
 Route::delete('revisions/{revision}', [RevisionController::class, 'destroy'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'admin'])
     ->name('revisions.destroy');
