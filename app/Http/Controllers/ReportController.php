@@ -2,111 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Person;
-use App\Models\Vehicle;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Models\Revision;
-use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
     public function index(Request $request): Response
     {
-        $vehiclesByBrand = Vehicle::query()
-            ->selectRaw('brand, COUNT(*) as total')
-            ->groupBy('brand')
-            ->orderByDesc('total')
-            ->get();
-
-        $peopleWithVehicles = Person::query()
-            ->withCount('vehicles')
-            ->orderByDesc('vehicles_count')
-            ->get(['id', 'name', 'gender']);
-
-        $allPeople = Person::query()
-            ->orderBy('name')
-            ->get([
-                'id',
-                'name',
-                'cpf',
-                'birth_date',
-                'gender',
-                'email',
-                'phone',
-                'city',
-                'state',
-            ]);
-
-        $peopleByCity = Person::query()
-            ->select('city')
-            ->selectRaw('COUNT(*) as total')
-            ->whereNotNull('city')
-            ->where('city', '!=', '')
-            ->groupBy('city')
-            ->orderByDesc('total')
-            ->orderBy('city')
-            ->get();
-
-        $peopleByGender = Person::query()
-            ->select('gender')
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw(
-                'AVG(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date))) as average_age'
-            )
-            ->whereIn('gender', ['Feminino', 'Masculino'])
-            ->groupBy('gender')
-            ->orderBy('gender')
-            ->get();
-
-        $vehiclesByPerson = Person::query()
-            ->with([
-                'vehicles' => function ($query) {
-                    $query
-                        ->orderBy('brand')
-                        ->orderBy('model');
-                },
-            ])
-            ->whereHas('vehicles')
-            ->orderBy('name')
-            ->get(['id', 'name', 'gender']);
-
-        $allVehicles = Vehicle::query()
-            ->with('person:id,name')
-            ->orderBy('brand')
-            ->orderBy('model')
-            ->get(['id', 'person_id', 'plate', 'brand', 'model', 'year', 'color']);
-
-        $vehiclesByYear = Vehicle::query()
-            ->select('year')
-            ->selectRaw('COUNT(*) as total')
-            ->groupBy('year')
-            ->orderBy('year')
-            ->get();
-
-        $peopleWithMostVehiclesByGender = Person::query()
-            ->withCount('vehicles')
-            ->whereIn('gender', ['Feminino', 'Masculino'])
-            ->whereHas('vehicles')
-            ->orderBy('gender')
-            ->orderByDesc('vehicles_count')
-            ->get(['id', 'name', 'gender'])
-            ->groupBy('gender')
-            ->map(function ($people) {
-                return $people->first();
-            })
-            ->values();
-
-        $brandsByGender = Vehicle::query()
-            ->join('people', 'people.id', '=', 'vehicles.person_id')
-            ->select('vehicles.brand', 'people.gender')
-            ->selectRaw('COUNT(*) as total')
-            ->whereIn('people.gender', ['Feminino', 'Masculino'])
-            ->groupBy('vehicles.brand', 'people.gender')
-            ->orderBy('vehicles.brand')
-            ->orderByDesc('total')
-            ->get();
-
         $filters = $request->validate([
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
@@ -114,113 +18,398 @@ class ReportController extends Controller
 
         $startDate = $filters['start_date'] ?? null;
         $endDate = $filters['end_date'] ?? null;
+        [$revisionWhereSql, $revisionBindings] = $this->revisionFilters(
+            $startDate,
+            $endDate,
+        );
 
-        $revisionsInPeriod = Revision::query()
-            ->with('vehicle.person')
-            ->when($startDate, function ($query) use ($startDate) {
-                $query->whereDate('revision_date', '>=', $startDate);
-            })
-            ->when($endDate, function ($query) use ($endDate) {
-                $query->whereDate('revision_date', '<=', $endDate);
-            })
-            ->orderByDesc('revision_date')
-            ->get();
+        $vehiclesByBrand = collect(DB::select(<<<'SQL'
+            SELECT brand, COUNT(*) AS total
+            FROM vehicles
+            GROUP BY brand
+            ORDER BY total DESC, brand
+        SQL
+        ))->map(fn (object $row) => [
+            'brand' => $row->brand,
+            'total' => (int) $row->total,
+        ])->values();
 
-        $revisionsByMonth = $revisionsInPeriod
-            ->groupBy(fn ($revision) => $revision->revision_date->format('Y-m'))
-            ->map(fn ($revisions, $month) => [
-                'month' => $month,
-                'total' => $revisions->count(),
-            ])
-            ->sortKeys()
-            ->values();
+        $peopleWithVehicles = collect(DB::select(<<<'SQL'
+            SELECT
+                p.id,
+                p.name,
+                p.gender,
+                COUNT(v.id) AS vehicles_count
+            FROM people AS p
+            LEFT JOIN vehicles AS v ON v.person_id = p.id
+            GROUP BY p.id, p.name, p.gender
+            ORDER BY vehicles_count DESC, p.name
+        SQL
+        ))->map(fn (object $row) => [
+            'id' => (int) $row->id,
+            'name' => $row->name,
+            'gender' => $row->gender,
+            'vehicles_count' => (int) $row->vehicles_count,
+        ])->values();
 
-        $averageRevisionIntervals = $revisionsInPeriod
-            ->filter(fn ($revision) => $revision->vehicle?->person)
-            ->groupBy(fn ($revision) => $revision->vehicle->person->id)
-            ->map(function ($revisions) {
-                $orderedRevisions = $revisions->sortBy('revision_date')->values();
-                $intervals = [];
+        $allPeople = DB::select(<<<'SQL'
+            SELECT
+                id,
+                name,
+                cpf,
+                birth_date,
+                gender,
+                email,
+                phone,
+                city,
+                state
+            FROM people
+            ORDER BY name
+        SQL);
 
-                for ($index = 1; $index < $orderedRevisions->count(); $index++) {
-                    $intervals[] = $orderedRevisions[$index - 1]
-                        ->revision_date
-                        ->diffInDays($orderedRevisions[$index]->revision_date);
-                }
+        $peopleByCity = collect(DB::select(<<<'SQL'
+            SELECT city, COUNT(*) AS total
+            FROM people
+            WHERE city IS NOT NULL AND city <> ''
+            GROUP BY city
+            ORDER BY total DESC, city
+        SQL
+        ))->map(fn (object $row) => [
+            'city' => $row->city,
+            'total' => (int) $row->total,
+        ])->values();
 
-                if ($intervals === []) {
-                    return null;
-                }
+        $peopleByGender = collect(DB::select(<<<'SQL'
+            SELECT
+                gender,
+                COUNT(*) AS total,
+                ROUND(
+                    AVG(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date)))::numeric,
+                    1
+                ) AS average_age
+            FROM people
+            WHERE gender IN ('Feminino', 'Masculino')
+            GROUP BY gender
+            ORDER BY gender
+        SQL
+        ))->map(fn (object $row) => [
+            'gender' => $row->gender,
+            'total' => (int) $row->total,
+            'average_age' => $row->average_age !== null
+                ? (float) $row->average_age
+                : null,
+        ])->values();
+
+        $vehiclesByPersonRows = DB::select(<<<'SQL'
+            SELECT
+                p.id,
+                p.name,
+                p.gender,
+                v.id AS vehicle_id,
+                v.plate,
+                v.brand,
+                v.model,
+                v.year,
+                v.color
+            FROM people AS p
+            JOIN vehicles AS v ON v.person_id = p.id
+            ORDER BY p.name, v.brand, v.model
+        SQL);
+
+        $vehiclesByPerson = collect($vehiclesByPersonRows)
+            ->groupBy('id')
+            ->map(function ($rows) {
+                $person = $rows->first();
 
                 return [
-                    'person_id' => $orderedRevisions->first()->vehicle->person->id,
-                    'name' => $orderedRevisions->first()->vehicle->person->name,
-                    'average_days' => round(array_sum($intervals) / count($intervals), 1),
-                ];
-            })
-            ->filter()
-            ->sortByDesc('average_days')
-            ->values();
-
-        $nextRevisions = $revisionsInPeriod
-            ->filter(fn ($revision) => $revision->vehicle?->person)
-            ->groupBy(fn ($revision) => $revision->vehicle->person->id)
-            ->map(function ($revisions) use ($averageRevisionIntervals) {
-                $lastRevision = $revisions
-                    ->sortByDesc('revision_date')
-                    ->first();
-                $person = $lastRevision->vehicle->person;
-                $average = $averageRevisionIntervals->firstWhere('person_id', $person->id);
-
-                if (!$average) {
-                    return null;
-                }
-
-                $averageDays = (int) round($average['average_days']);
-
-                return [
-                    'person_id' => $person->id,
+                    'id' => (int) $person->id,
                     'name' => $person->name,
-                    'last_revision_date' => $lastRevision->revision_date->toDateString(),
-                    'average_days' => $average['average_days'],
-                    'next_revision_date' => $lastRevision->revision_date
-                        ->copy()
-                        ->addDays($averageDays)
-                        ->toDateString(),
+                    'gender' => $person->gender,
+                    'vehicles' => $rows->map(fn (object $row) => [
+                        'id' => (int) $row->vehicle_id,
+                        'plate' => $row->plate,
+                        'brand' => $row->brand,
+                        'model' => $row->model,
+                        'year' => (int) $row->year,
+                        'color' => $row->color,
+                    ])->values()->all(),
                 ];
             })
-            ->filter()
-            ->sortBy('next_revision_date')
             ->values();
 
-        $revisionsByBrand = Revision::query()
-            ->join('vehicles', 'vehicles.id', '=', 'revisions.vehicle_id')
-            ->select('vehicles.brand')
-            ->selectRaw('COUNT(revisions.id) as total')
-            ->when($startDate, function ($query) use ($startDate) {
-                $query->whereDate('revisions.revision_date', '>=', $startDate);
-            })
-            ->when($endDate, function ($query) use ($endDate) {
-                $query->whereDate('revisions.revision_date', '<=', $endDate);
-            })
-            ->groupBy('vehicles.brand')
-            ->orderByDesc('total')
-            ->get();
+        $allVehicles = collect(DB::select(<<<'SQL'
+            SELECT
+                v.id,
+                v.plate,
+                v.brand,
+                v.model,
+                v.year,
+                v.color,
+                p.id AS person_id,
+                p.name AS person_name
+            FROM vehicles AS v
+            LEFT JOIN people AS p ON p.id = v.person_id
+            ORDER BY v.brand, v.model
+        SQL
+        ))->map(fn (object $row) => [
+            'id' => (int) $row->id,
+            'plate' => $row->plate,
+            'brand' => $row->brand,
+            'model' => $row->model,
+            'year' => (int) $row->year,
+            'color' => $row->color,
+            'person' => $row->person_id !== null
+                ? [
+                    'id' => (int) $row->person_id,
+                    'name' => $row->person_name,
+                ]
+                : null,
+        ])->values();
 
-        $peopleByRevisionCount = Revision::query()
-            ->join('vehicles', 'vehicles.id', '=', 'revisions.vehicle_id')
-            ->join('people', 'people.id', '=', 'vehicles.person_id')
-            ->select('people.id', 'people.name', 'people.gender')
-            ->selectRaw('COUNT(revisions.id) as total')
-            ->when($startDate, function ($query) use ($startDate) {
-                $query->whereDate('revisions.revision_date', '>=', $startDate);
-            })
-            ->when($endDate, function ($query) use ($endDate) {
-                $query->whereDate('revisions.revision_date', '<=', $endDate);
-            })
-            ->groupBy('people.id', 'people.name', 'people.gender')
-            ->orderByDesc('total')
-            ->get();
+        $vehiclesByYear = collect(DB::select(<<<'SQL'
+            SELECT year, COUNT(*) AS total
+            FROM vehicles
+            GROUP BY year
+            ORDER BY year
+        SQL
+        ))->map(fn (object $row) => [
+            'year' => (int) $row->year,
+            'total' => (int) $row->total,
+        ])->values();
+
+        $peopleWithMostVehiclesByGender = collect(DB::select(<<<'SQL'
+            WITH vehicle_counts AS (
+                SELECT
+                    p.id,
+                    p.name,
+                    p.gender,
+                    COUNT(v.id) AS vehicles_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY p.gender
+                        ORDER BY COUNT(v.id) DESC, p.name
+                    ) AS position
+                FROM people AS p
+                JOIN vehicles AS v ON v.person_id = p.id
+                WHERE p.gender IN ('Feminino', 'Masculino')
+                GROUP BY p.id, p.name, p.gender
+            )
+            SELECT id, name, gender, vehicles_count
+            FROM vehicle_counts
+            WHERE position = 1
+            ORDER BY gender
+        SQL
+        ))->map(fn (object $row) => [
+            'id' => (int) $row->id,
+            'name' => $row->name,
+            'gender' => $row->gender,
+            'vehicles_count' => (int) $row->vehicles_count,
+        ])->values();
+
+        $brandsByGender = collect(DB::select(<<<'SQL'
+            SELECT
+                v.brand,
+                p.gender,
+                COUNT(*) AS total
+            FROM vehicles AS v
+            JOIN people AS p ON p.id = v.person_id
+            WHERE p.gender IN ('Feminino', 'Masculino')
+            GROUP BY v.brand, p.gender
+            ORDER BY v.brand, total DESC
+        SQL
+        ))->map(fn (object $row) => [
+            'brand' => $row->brand,
+            'gender' => $row->gender,
+            'total' => (int) $row->total,
+        ])->values();
+
+        $revisionsInPeriodRows = DB::select(
+            <<<SQL
+                SELECT
+                    r.id,
+                    r.maintenance_type,
+                    r.revision_date,
+                    r.mileage,
+                    r.description,
+                    r.cost,
+                    r.next_revision_date,
+                    v.plate,
+                    v.brand,
+                    v.model,
+                    p.name AS person_name
+                FROM revisions AS r
+                JOIN vehicles AS v ON v.id = r.vehicle_id
+                LEFT JOIN people AS p ON p.id = v.person_id
+                {$revisionWhereSql}
+                ORDER BY r.revision_date DESC
+            SQL
+            ,
+            $revisionBindings,
+        );
+
+        $revisionsInPeriod = collect($revisionsInPeriodRows)->map(
+            fn (object $row) => [
+                'id' => (int) $row->id,
+                'maintenance_type' => $row->maintenance_type,
+                'revision_date' => $row->revision_date,
+                'mileage' => (int) $row->mileage,
+                'description' => $row->description,
+                'cost' => $row->cost !== null ? (float) $row->cost : null,
+                'next_revision_date' => $row->next_revision_date,
+                'vehicle' => [
+                    'plate' => $row->plate,
+                    'brand' => $row->brand,
+                    'model' => $row->model,
+                    'person' => $row->person_name !== null
+                        ? ['name' => $row->person_name]
+                        : null,
+                ],
+            ],
+        )->values();
+
+        $revisionsByMonth = collect(DB::select(
+            <<<SQL
+                SELECT
+                    TO_CHAR(DATE_TRUNC('month', r.revision_date), 'YYYY-MM') AS month,
+                    COUNT(*) AS total
+                FROM revisions AS r
+                {$revisionWhereSql}
+                GROUP BY DATE_TRUNC('month', r.revision_date)
+                ORDER BY month
+            SQL
+            ,
+            $revisionBindings,
+        ))->map(fn (object $row) => [
+            'month' => $row->month,
+            'total' => (int) $row->total,
+        ])->values();
+
+        $revisionsByBrand = collect(DB::select(
+            <<<SQL
+                SELECT v.brand, COUNT(r.id) AS total
+                FROM revisions AS r
+                JOIN vehicles AS v ON v.id = r.vehicle_id
+                {$revisionWhereSql}
+                GROUP BY v.brand
+                ORDER BY total DESC, v.brand
+            SQL
+            ,
+            $revisionBindings,
+        ))->map(fn (object $row) => [
+            'brand' => $row->brand,
+            'total' => (int) $row->total,
+        ])->values();
+
+        $peopleByRevisionCount = collect(DB::select(
+            <<<SQL
+                SELECT
+                    p.id,
+                    p.name,
+                    p.gender,
+                    COUNT(r.id) AS total
+                FROM revisions AS r
+                JOIN vehicles AS v ON v.id = r.vehicle_id
+                JOIN people AS p ON p.id = v.person_id
+                {$revisionWhereSql}
+                GROUP BY p.id, p.name, p.gender
+                ORDER BY total DESC, p.name
+            SQL
+            ,
+            $revisionBindings,
+        ))->map(fn (object $row) => [
+            'id' => (int) $row->id,
+            'name' => $row->name,
+            'gender' => $row->gender,
+            'total' => (int) $row->total,
+        ])->values();
+
+        $averageRevisionIntervals = collect(DB::select(
+            <<<SQL
+                WITH ordered_revisions AS (
+                    SELECT
+                        p.id AS person_id,
+                        p.name,
+                        r.revision_date,
+                        LAG(r.revision_date) OVER (
+                            PARTITION BY p.id
+                            ORDER BY r.revision_date
+                        ) AS previous_revision_date
+                    FROM revisions AS r
+                    JOIN vehicles AS v ON v.id = r.vehicle_id
+                    JOIN people AS p ON p.id = v.person_id
+                    {$revisionWhereSql}
+                )
+                SELECT
+                    person_id,
+                    name,
+                    ROUND(AVG(revision_date - previous_revision_date)::numeric, 1)
+                        AS average_days
+                FROM ordered_revisions
+                WHERE previous_revision_date IS NOT NULL
+                GROUP BY person_id, name
+                ORDER BY average_days DESC
+            SQL
+            ,
+            $revisionBindings,
+        ))->map(fn (object $row) => [
+            'person_id' => (int) $row->person_id,
+            'name' => $row->name,
+            'average_days' => (float) $row->average_days,
+        ])->values();
+
+        $nextRevisions = collect(DB::select(
+            <<<SQL
+                WITH ordered_revisions AS (
+                    SELECT
+                        p.id AS person_id,
+                        p.name,
+                        r.revision_date,
+                        LAG(r.revision_date) OVER (
+                            PARTITION BY p.id
+                            ORDER BY r.revision_date
+                        ) AS previous_revision_date,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY p.id
+                            ORDER BY r.revision_date DESC
+                        ) AS revision_order
+                    FROM revisions AS r
+                    JOIN vehicles AS v ON v.id = r.vehicle_id
+                    JOIN people AS p ON p.id = v.person_id
+                    {$revisionWhereSql}
+                ),
+                average_intervals AS (
+                    SELECT
+                        person_id,
+                        name,
+                        AVG(revision_date - previous_revision_date) AS average_days
+                    FROM ordered_revisions
+                    WHERE previous_revision_date IS NOT NULL
+                    GROUP BY person_id, name
+                ),
+                latest_revisions AS (
+                    SELECT person_id, name, revision_date AS last_revision_date
+                    FROM ordered_revisions
+                    WHERE revision_order = 1
+                )
+                SELECT
+                    l.person_id,
+                    l.name,
+                    l.last_revision_date,
+                    ROUND(a.average_days::numeric, 1) AS average_days,
+                    l.last_revision_date + ROUND(a.average_days)::integer
+                        AS next_revision_date
+                FROM latest_revisions AS l
+                JOIN average_intervals AS a ON a.person_id = l.person_id
+                ORDER BY next_revision_date
+            SQL
+            ,
+            $revisionBindings,
+        ))->map(fn (object $row) => [
+            'person_id' => (int) $row->person_id,
+            'name' => $row->name,
+            'last_revision_date' => $row->last_revision_date,
+            'average_days' => (float) $row->average_days,
+            'next_revision_date' => $row->next_revision_date,
+        ])->values();
 
         return Inertia::render('reports/Index', [
             'peopleByGender' => $peopleByGender,
@@ -244,5 +433,31 @@ class ReportController extends Controller
             'averageRevisionIntervals' => $averageRevisionIntervals,
             'nextRevisions' => $nextRevisions,
         ]);
+    }
+
+    /**
+     * @return array{0: string, 1: array<int, string>}
+     */
+    private function revisionFilters(?string $startDate, ?string $endDate): array
+    {
+        $conditions = [];
+        $bindings = [];
+
+        if ($startDate !== null) {
+            $conditions[] = 'r.revision_date >= ?';
+            $bindings[] = $startDate;
+        }
+
+        if ($endDate !== null) {
+            $conditions[] = 'r.revision_date <= ?';
+            $bindings[] = $endDate;
+        }
+
+        return [
+            $conditions === []
+                ? ''
+                : 'WHERE '.implode(' AND ', $conditions),
+            $bindings,
+        ];
     }
 }
