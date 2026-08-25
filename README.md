@@ -84,6 +84,17 @@ Para limpar caches depois de alterar `.env` ou configurações:
 docker compose exec laravel.test php artisan optimize:clear
 ```
 
+## Dados de demonstração
+
+Para inserir dados fictícios de apresentação diretamente no PostgreSQL:
+
+```powershell
+docker compose cp docs/dados-demonstracao.sql pgsql:/tmp/dados-demonstracao.sql
+docker compose exec pgsql psql -U sail -d laravel -f /tmp/dados-demonstracao.sql
+```
+
+O script insere pessoas, veículos e revisões sem depender dos IDs atuais. Ele evita duplicar pessoas e veículos quando executado novamente.
+
 ## Acesso ao sistema
 
 ### Administrador
@@ -228,5 +239,3 @@ Para iniciar novamente:
 ```powershell
 docker compose up -d
 ```
-
-Não use `docker compose down -v` durante a apresentação, pois essa opção remove o volume `sail-pgsql` e os dados cadastrados.

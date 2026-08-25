@@ -195,7 +195,8 @@ average_intervals AS (
         person_name,
         AVG(revision_date - previous_revision_date) AS average_days
     FROM ordered_revisions
-    WHERE previous_revision_date IS NOT NULL
+    WH
+    ERE previous_revision_date IS NOT NULL
     GROUP BY person_id, person_name
 ),
 latest_revisions AS (

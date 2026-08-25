@@ -27,7 +27,7 @@ class ValidCpf implements ValidationRule
             return;
         }
 
-        for ($position = 9; $position <= 10; $position++) {
+        for ($position =9 ; $position <= 10; $position++) {
             $sum = 0;
 
             for ($index = 0; $index < $position; $index++) {
