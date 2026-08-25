@@ -18,7 +18,9 @@ class VehicleController extends Controller
     public function index(): Response
     {
         return Inertia::render('vehicles/Index', [
-            'vehicles' => Vehicle::with('person')
+            'vehicles' => Vehicle::query()
+                ->select(['id', 'person_id', 'plate', 'brand', 'model', 'year', 'color'])
+                ->with('person:id,name')
                 ->orderBy('brand')
                 ->orderBy('model')
                 ->get(),

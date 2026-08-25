@@ -83,7 +83,6 @@ interface RevisionReport {
     maintenance_type: string;
     revision_date: string;
     mileage: number;
-    description: string;
     cost: number | string | null;
     next_revision_date: string | null;
     vehicle: {

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
-use App\Models\Revision;
 use App\Models\Vehicle;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,13 +17,57 @@ class DashboardController extends Controller
         $clientPersonId = $request->session()->get('client_person_id');
 
         if ($clientPersonId !== null || $user?->isClient()) {
+            $personQuery = fn () => Person::query()
+                ->select([
+                    'id',
+                    'name',
+                    'cpf',
+                    'email',
+                    'phone',
+                    'city',
+                    'state',
+                ])
+                ->with([
+                    'vehicles' => fn ($query) => $query
+                        ->select([
+                            'id',
+                            'person_id',
+                            'plate',
+                            'brand',
+                            'model',
+                            'year',
+                            'color',
+                        ])
+                        ->orderBy('plate')
+                        ->with([
+                            'revisions' => fn ($query) => $query
+                                ->select([
+                                    'id',
+                                    'vehicle_id',
+                                    'maintenance_type',
+                                    'revision_date',
+                                    'mileage',
+                                    'next_revision_date',
+                                ])
+                                ->orderByDesc('revision_date'),
+                        ]),
+                ]);
+
             $person = $clientPersonId !== null
-                ? Person::query()->with('vehicles.revisions')->find($clientPersonId)
+                ? $personQuery()->find($clientPersonId)
                 : $user->person()
-                    ->with('vehicles.revisions')
+                    ->select([
+                        'people.id',
+                        'people.name',
+                        'people.cpf',
+                        'people.email',
+                        'people.phone',
+                        'people.city',
+                        'people.state',
+                    ])
+                    ->with($personQuery()->getEagerLoads())
                     ->first()
-                    ?? Person::query()
-                        ->with('vehicles.revisions')
+                    ?? $personQuery()
                         ->where('email', $user->email)
                         ->first();
 
@@ -57,21 +101,32 @@ class DashboardController extends Controller
             ])
             ->values();
 
-        $revisionsByMonth = Revision::query()
-            ->orderBy('revision_date')
-            ->get(['revision_date'])
-            ->filter(fn ($revision) => $revision->revision_date !== null)
-            ->groupBy(fn ($revision) => $revision->revision_date->format('Y-m'))
-            ->map(fn ($revisions, $month) => [
-                'month' => $month,
-                'total' => $revisions->count(),
-            ])
-            ->values();
+        $revisionsByMonth = collect(DB::select(<<<'SQL'
+            SELECT
+                TO_CHAR(DATE_TRUNC('month', revision_date), 'YYYY-MM') AS month,
+                COUNT(*) AS total
+            FROM revisions
+            WHERE revision_date IS NOT NULL
+            GROUP BY DATE_TRUNC('month', revision_date)
+            ORDER BY month
+        SQL
+        ))->map(fn (object $row) => [
+            'month' => $row->month,
+            'total' => (int) $row->total,
+        ])->values();
+
+        $totals = DB::selectOne(<<<'SQL'
+            SELECT
+                (SELECT COUNT(*) FROM people) AS people,
+                (SELECT COUNT(*) FROM vehicles) AS vehicles,
+                (SELECT COUNT(*) FROM revisions) AS revisions
+        SQL
+        );
 
         return Inertia::render('Dashboard', [
-            'totalPeople' => Person::count(),
-            'totalVehicles' => Vehicle::count(),
-            'totalRevisions' => Revision::count(),
+            'totalPeople' => (int) $totals->people,
+            'totalVehicles' => (int) $totals->vehicles,
+            'totalRevisions' => (int) $totals->revisions,
             'vehiclesByBrand' => $vehiclesByBrand,
             'peopleWithVehicles' => $peopleWithVehicles,
             'revisionsByMonth' => $revisionsByMonth,

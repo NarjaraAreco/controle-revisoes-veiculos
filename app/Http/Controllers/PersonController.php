@@ -18,6 +18,7 @@ class PersonController extends Controller
     {
         return Inertia::render('people/Index', [
             'people' => Person::query()
+                ->select(['id', 'name', 'cpf', 'email', 'city', 'state'])
                 ->orderBy('name')
                 ->get(),
         ]);

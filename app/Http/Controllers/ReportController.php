@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,7 +24,7 @@ class ReportController extends Controller
             $endDate,
         );
 
-        $vehiclesByBrand = collect(DB::select(<<<'SQL'
+        $vehiclesByBrand = collect($this->selectCached(<<<'SQL'
             SELECT brand, COUNT(*) AS total
             FROM vehicles
             GROUP BY brand
@@ -34,7 +35,7 @@ class ReportController extends Controller
             'total' => (int) $row->total,
         ])->values();
 
-        $peopleWithVehicles = collect(DB::select(<<<'SQL'
+        $peopleWithVehicles = collect($this->selectCached(<<<'SQL'
             SELECT
                 p.id,
                 p.name,
@@ -52,7 +53,7 @@ class ReportController extends Controller
             'vehicles_count' => (int) $row->vehicles_count,
         ])->values();
 
-        $allPeople = DB::select(<<<'SQL'
+        $allPeople = $this->selectCached(<<<'SQL'
             SELECT
                 id,
                 name,
@@ -67,7 +68,7 @@ class ReportController extends Controller
             ORDER BY name
         SQL);
 
-        $peopleByCity = collect(DB::select(<<<'SQL'
+        $peopleByCity = collect($this->selectCached(<<<'SQL'
             SELECT city, COUNT(*) AS total
             FROM people
             WHERE city IS NOT NULL AND city <> ''
@@ -79,7 +80,7 @@ class ReportController extends Controller
             'total' => (int) $row->total,
         ])->values();
 
-        $peopleByGender = collect(DB::select(<<<'SQL'
+        $peopleByGender = collect($this->selectCached(<<<'SQL'
             SELECT
                 gender,
                 COUNT(*) AS total,
@@ -100,7 +101,7 @@ class ReportController extends Controller
                 : null,
         ])->values();
 
-        $vehiclesByPersonRows = DB::select(<<<'SQL'
+        $vehiclesByPersonRows = $this->selectCached(<<<'SQL'
             SELECT
                 p.id,
                 p.name,
@@ -137,7 +138,7 @@ class ReportController extends Controller
             })
             ->values();
 
-        $allVehicles = collect(DB::select(<<<'SQL'
+        $allVehicles = collect($this->selectCached(<<<'SQL'
             SELECT
                 v.id,
                 v.plate,
@@ -166,7 +167,7 @@ class ReportController extends Controller
                 : null,
         ])->values();
 
-        $vehiclesByYear = collect(DB::select(<<<'SQL'
+        $vehiclesByYear = collect($this->selectCached(<<<'SQL'
             SELECT year, COUNT(*) AS total
             FROM vehicles
             GROUP BY year
@@ -177,7 +178,7 @@ class ReportController extends Controller
             'total' => (int) $row->total,
         ])->values();
 
-        $peopleWithMostVehiclesByGender = collect(DB::select(<<<'SQL'
+        $peopleWithMostVehiclesByGender = collect($this->selectCached(<<<'SQL'
             WITH vehicle_counts AS (
                 SELECT
                     p.id,
@@ -205,7 +206,7 @@ class ReportController extends Controller
             'vehicles_count' => (int) $row->vehicles_count,
         ])->values();
 
-        $brandsByGender = collect(DB::select(<<<'SQL'
+        $brandsByGender = collect($this->selectCached(<<<'SQL'
             SELECT
                 v.brand,
                 p.gender,
@@ -222,14 +223,13 @@ class ReportController extends Controller
             'total' => (int) $row->total,
         ])->values();
 
-        $revisionsInPeriodRows = DB::select(
+        $revisionsInPeriodRows = $this->selectCached(
             <<<SQL
                 SELECT
                     r.id,
                     r.maintenance_type,
                     r.revision_date,
                     r.mileage,
-                    r.description,
                     r.cost,
                     r.next_revision_date,
                     v.plate,
@@ -252,7 +252,6 @@ class ReportController extends Controller
                 'maintenance_type' => $row->maintenance_type,
                 'revision_date' => $row->revision_date,
                 'mileage' => (int) $row->mileage,
-                'description' => $row->description,
                 'cost' => $row->cost !== null ? (float) $row->cost : null,
                 'next_revision_date' => $row->next_revision_date,
                 'vehicle' => [
@@ -266,7 +265,7 @@ class ReportController extends Controller
             ],
         )->values();
 
-        $revisionsByMonth = collect(DB::select(
+        $revisionsByMonth = collect($this->selectCached(
             <<<SQL
                 SELECT
                     TO_CHAR(DATE_TRUNC('month', r.revision_date), 'YYYY-MM') AS month,
@@ -283,7 +282,7 @@ class ReportController extends Controller
             'total' => (int) $row->total,
         ])->values();
 
-        $revisionsByBrand = collect(DB::select(
+        $revisionsByBrand = collect($this->selectCached(
             <<<SQL
                 SELECT v.brand, COUNT(r.id) AS total
                 FROM revisions AS r
@@ -299,7 +298,7 @@ class ReportController extends Controller
             'total' => (int) $row->total,
         ])->values();
 
-        $peopleByRevisionCount = collect(DB::select(
+        $peopleByRevisionCount = collect($this->selectCached(
             <<<SQL
                 SELECT
                     p.id,
@@ -322,7 +321,7 @@ class ReportController extends Controller
             'total' => (int) $row->total,
         ])->values();
 
-        $averageRevisionIntervals = collect(DB::select(
+        $averageRevisionIntervals = collect($this->selectCached(
             <<<SQL
                 WITH ordered_revisions AS (
                     SELECT
@@ -356,7 +355,7 @@ class ReportController extends Controller
             'average_days' => (float) $row->average_days,
         ])->values();
 
-        $nextRevisions = collect(DB::select(
+        $nextRevisions = collect($this->selectCached(
             <<<SQL
                 WITH ordered_revisions AS (
                     SELECT
@@ -433,6 +432,27 @@ class ReportController extends Controller
             'averageRevisionIntervals' => $averageRevisionIntervals,
             'nextRevisions' => $nextRevisions,
         ]);
+    }
+
+    /**
+     * Cacheia somente o resultado da consulta, mantendo a montagem do payload
+     * fora do cache e permitindo que cada combinação de filtro tenha sua chave.
+     *
+     * @param  array<int, mixed>  $bindings
+     * @return array<int, object>
+     */
+    private function selectCached(string $sql, array $bindings = []): array
+    {
+        $key = 'report-query:'.md5($sql.'|'.serialize($bindings));
+
+        /** @var array<int, object> $rows */
+        $rows = Cache::remember(
+            $key,
+            now()->addSeconds(30),
+            fn (): array => DB::select($sql, $bindings),
+        );
+
+        return $rows;
     }
 
     /**

@@ -14,7 +14,20 @@ class RevisionController extends Controller
     public function index(): Response
     {
         return Inertia::render('revisions/Index', [
-            'revisions' => Revision::with('vehicle.person')
+            'revisions' => Revision::query()
+                ->select([
+                    'id',
+                    'vehicle_id',
+                    'maintenance_type',
+                    'revision_date',
+                    'mileage',
+                    'cost',
+                    'next_revision_date',
+                ])
+                ->with([
+                    'vehicle:id,plate,brand,model,person_id',
+                    'vehicle.person:id,name',
+                ])
                 ->orderByDesc('revision_date')
                 ->get(),
         ]);
