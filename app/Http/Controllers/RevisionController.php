@@ -64,7 +64,16 @@ class RevisionController extends Controller
     public function edit(Revision $revision): Response
     {
         return Inertia::render('revisions/Edit', [
-            'revision' => $revision,
+            'revision' => $revision->only([
+                'id',
+                'vehicle_id',
+                'maintenance_type',
+                'revision_date',
+                'mileage',
+                'description',
+                'cost',
+                'next_revision_date',
+            ]),
             'vehicles' => Vehicle::with('person')
                 ->orderBy('plate')
                 ->get([

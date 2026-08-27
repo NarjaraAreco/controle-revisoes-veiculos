@@ -34,7 +34,9 @@ class StoreRevisionRequest extends FormRequest
             'mileage' => [
                 'required',
                 'integer',
+                'regex:/^\d{1,10}$/',
                 'min:0',
+                'max:4294967295',
             ],
 
             'description' => [
@@ -46,7 +48,9 @@ class StoreRevisionRequest extends FormRequest
             'cost' => [
                 'nullable',
                 'numeric',
+                'regex:/^\d{1,8}(\.\d{1,2})?$/',
                 'min:0',
+                'max:99999999.99',
             ],
 
             'next_revision_date' => [
@@ -72,11 +76,13 @@ class StoreRevisionRequest extends FormRequest
 
             'mileage.required' => 'Informe a quilometragem.',
             'mileage.integer' => 'A quilometragem deve ser um número inteiro.',
+            'mileage.regex' => 'A quilometragem deve possuir no máximo 10 dígitos.',
             'mileage.min' => 'A quilometragem não pode ser negativa.',
 
             'description.required' => 'Informe a descrição da revisão.',
 
             'cost.numeric' => 'O custo deve ser um valor numérico.',
+            'cost.regex' => 'O custo deve possuir até 8 dígitos e 2 casas decimais.',
             'cost.min' => 'O custo não pode ser negativo.',
 
             'next_revision_date.after_or_equal' =>

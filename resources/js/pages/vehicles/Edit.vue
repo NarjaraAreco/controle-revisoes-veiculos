@@ -2,7 +2,14 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
+import {
+    blockNonNumericKeys,
+    formatPlate,
+    sanitizeDigits,
+    showClientErrors,
+    validateVehicle,
+} from '@/lib/clientValidation';
 
 interface Person {
     id: number;
@@ -44,12 +51,15 @@ const maxYear = new Date().getFullYear() + 1;
 const colors = ref<Color[]>([]);
 const colorsLoading = ref(false);
 const colorsError = ref('');
+const colorsLoaded = ref(false);
 const brands = ref<Brand[]>([]);
 const brandsLoading = ref(false);
 const brandsError = ref('');
+const brandsLoaded = ref(false);
 const models = ref<VehicleModel[]>([]);
 const modelsLoading = ref(false);
 const modelsError = ref('');
+const modelsLoadedForBrand = ref('');
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -64,14 +74,23 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const form = useForm({
     person_id: String(vehicle.person_id),
-    plate: vehicle.plate,
+    plate: formatPlate(vehicle.plate),
     brand: vehicle.brand,
     model: vehicle.model,
     year: String(vehicle.year),
     color: vehicle.color ?? '',
 });
+
+function sanitizePlate() {
+    form.plate = formatPlate(form.plate);
+}
+
 //API cores
 async function loadColors() {
+    if (colorsLoaded.value || colorsLoading.value) {
+        return;
+    }
+
     colorsLoading.value = true;
     colorsError.value = '';
 
@@ -83,6 +102,7 @@ async function loadColors() {
         }
 
         colors.value = await response.json();
+        colorsLoaded.value = true;
     } catch {
         colorsError.value = 'Não foi possível carregar as cores.';
     } finally {
@@ -92,6 +112,10 @@ async function loadColors() {
 
 //API veiculos
 async function loadBrands() {
+    if (brandsLoaded.value || brandsLoading.value) {
+        return;
+    }
+
     brandsLoading.value = true;
     brandsError.value = '';
 
@@ -103,6 +127,7 @@ async function loadBrands() {
         }
 
         brands.value = await response.json();
+        brandsLoaded.value = true;
     } catch {
         brandsError.value = 'Não foi possível carregar as marcas.';
     } finally {
@@ -110,19 +135,40 @@ async function loadBrands() {
     }
 }
 
-async function loadModels() {
+async function loadModels(resetModel = false) {
+    const savedModel = form.model;
+
+    if (resetModel) {
+        form.model = '';
+    }
+
+    modelsError.value = '';
+
+    await loadBrands();
+
     const selectedBrand = brands.value.find(
         (brand) => brand.name === form.brand,
     );
 
-    form.model = '';
-    models.value = [];
-    modelsError.value = '';
-
     if (!selectedBrand) {
+        models.value = [];
+
+        if (!resetModel) {
+            form.model = savedModel;
+        }
+
         return;
     }
 
+    if (modelsLoadedForBrand.value === selectedBrand.id) {
+        if (!resetModel) {
+            form.model = savedModel;
+        }
+
+        return;
+    }
+
+    models.value = [];
     modelsLoading.value = true;
 
     try {
@@ -135,25 +181,38 @@ async function loadModels() {
         }
 
         models.value = await response.json();
+        modelsLoadedForBrand.value = selectedBrand.id;
     } catch {
         modelsError.value = 'Não foi possível carregar os modelos.';
     } finally {
         modelsLoading.value = false;
+
+        if (!resetModel) {
+            form.model = savedModel;
+        }
     }
 }
 
 function submit() {
+    const errors = validateVehicle(form, maxYear);
+    if (Object.keys(errors).length > 0) {
+        showClientErrors(errors);
+        return;
+    }
+
+    if (form.person_id !== String(vehicle.person_id)) {
+        const confirmed = window.confirm(
+            'Este veículo será vinculado a outro proprietário. Deseja continuar?',
+        );
+
+        if (!confirmed) {
+            form.person_id = String(vehicle.person_id);
+            return;
+        }
+    }
+
     form.put(`/vehicles/${vehicle.id}`);
 }
-
-onMounted(async () => {
-    loadColors();
-
-    await loadBrands();
-    await loadModels();
-
-    form.model = vehicle.model;
-});
 
 </script>
 
@@ -196,8 +255,9 @@ onMounted(async () => {
                         Placa
                     </label>
 
-                    <input id="plate" v-model="form.plate" type="text" required maxlength="7" placeholder="ABC1D23"
-                        class="w-full rounded-md border bg-background px-3 py-2 uppercase" />
+                    <input id="plate" v-model="form.plate" type="text" required maxlength="8" placeholder="ABC-1234"
+                        class="w-full rounded-md border bg-background px-3 py-2 uppercase"
+                        @input="sanitizePlate" />
 
                     <p v-if="form.errors.plate" class="mt-1 text-sm text-red-500">
                         {{ form.errors.plate }}
@@ -210,19 +270,20 @@ onMounted(async () => {
                     </label>
 
                     <select id="brand" v-model="form.brand" required :disabled="brandsLoading"
-                        class="w-full rounded-md border bg-background px-3 py-2" @change="loadModels">
-                        <option value="">
-                            {{
-                                brandsLoading
-                                    ? 'Carregando marcas...'
-                                    : 'Selecione a marca'
-                            }}
+                        class="w-full rounded-md border bg-background px-3 py-2" @focus="loadBrands"
+                        @change="loadModels(true)">
+                        <option v-if="!brands.some((brand) => brand.name === vehicle.brand)" :value="vehicle.brand">
+                            {{ vehicle.brand }}
                         </option>
 
                         <option v-for="brand in brands" :key="brand.id" :value="brand.name">
                             {{ brand.name }}
                         </option>
                     </select>
+
+                    <p v-if="brandsLoading" class="mt-1 text-sm text-muted-foreground">
+                        Carregando marcas da API/cache...
+                    </p>
 
                     <p v-if="brandsError" class="mt-1 text-sm text-red-500">
                         {{ brandsError }}
@@ -239,21 +300,19 @@ onMounted(async () => {
                     </label>
 
                     <select id="model" v-model="form.model" required :disabled="!form.brand || modelsLoading"
-                        class="w-full rounded-md border bg-background px-3 py-2">
-                        <option value="">
-                            {{
-                                !form.brand
-                                    ? 'Selecione uma marca primeiro'
-                                    : modelsLoading
-                                        ? 'Carregando modelos...'
-                                        : 'Selecione o modelo'
-                            }}
+                        class="w-full rounded-md border bg-background px-3 py-2" @focus="loadModels()">
+                        <option v-if="!models.some((model) => model.name === vehicle.model)" :value="vehicle.model">
+                            {{ vehicle.model }}
                         </option>
 
                         <option v-for="model in models" :key="model.id" :value="model.name">
                             {{ model.name }}
                         </option>
                     </select>
+
+                    <p v-if="modelsLoading" class="mt-1 text-sm text-muted-foreground">
+                        Carregando modelos da API/cache...
+                    </p>
 
                     <p v-if="modelsError" class="mt-1 text-sm text-red-500">
                         {{ modelsError }}
@@ -265,18 +324,37 @@ onMounted(async () => {
                 </div>
 
                 <div>
+                    <label for="year" class="mb-2 block text-sm font-medium">
+                        Ano
+                    </label>
+
+                    <input id="year" v-model="form.year" type="number" required min="1900" :max="maxYear"
+                        inputmode="numeric" @keydown="blockNonNumericKeys" @input="form.year = sanitizeDigits(form.year, 4)"
+                        class="w-full rounded-md border bg-background px-3 py-2" />
+
+                    <p v-if="form.errors.year" class="mt-1 text-sm text-red-500">
+                        {{ form.errors.year }}
+                    </p>
+                </div>
+
+                <div>
                     <label for="color" class="mb-2 block text-sm font-medium">
                         Cor
                     </label>
 
                     <select id="color" v-model="form.color" :disabled="colorsLoading"
-                        class="w-full rounded-md border bg-background px-3 py-2">
+                        class="w-full rounded-md border bg-background px-3 py-2" @focus="loadColors">
                         <option value="">
                             {{
                                 colorsLoading
                                     ? 'Carregando cores...'
                                     : 'Selecione a cor'
                             }}
+                        </option>
+
+                        <option v-if="vehicle.color && !colors.some((color) => color.name === vehicle.color)"
+                            :value="vehicle.color">
+                            {{ vehicle.color }}
                         </option>
 
                         <option v-for="color in colors" :key="color.id" :value="color.name">

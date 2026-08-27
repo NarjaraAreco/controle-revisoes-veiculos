@@ -49,6 +49,182 @@ Route::get('api/colors', function () {
             'id' => 'azul',
             'name' => 'Azul',
         ],
+        [
+            'id' => 'verde',
+            'name' => 'Verde',
+        ],
+        [
+            'id' => 'amarelo',
+            'name' => 'Amarelo',
+        ],
+        [
+            'id' => 'laranja',
+            'name' => 'Laranja',
+        ],
+        [
+            'id' => 'marrom',
+            'name' => 'Marrom',
+        ],
+        [
+            'id' => 'bege',
+            'name' => 'Bege',
+        ],
+        [
+            'id' => 'dourado',
+            'name' => 'Dourado',
+        ],
+        [
+            'id' => 'roxo',
+            'name' => 'Roxo',
+        ],
+        [
+            'id' => 'rosa',
+            'name' => 'Rosa',
+        ],
+        [
+            'id' => 'vinho',
+            'name' => 'Vinho',
+        ],
+        [
+            'id' => 'grafite',
+            'name' => 'Grafite',
+        ],
+        [
+            'id' => 'azul-marinho',
+            'name' => 'Azul-marinho',
+        ],
+        [
+            'id' => 'azul-claro',
+            'name' => 'Azul-claro',
+        ],
+        [
+            'id' => 'azul-escuro',
+            'name' => 'Azul-escuro',
+        ],
+        [
+            'id' => 'azul-petroleo',
+            'name' => 'Azul-petróleo',
+        ],
+        [
+            'id' => 'azul-turquesa',
+            'name' => 'Azul-turquesa',
+        ],
+        [
+            'id' => 'verde-claro',
+            'name' => 'Verde-claro',
+        ],
+        [
+            'id' => 'verde-escuro',
+            'name' => 'Verde-escuro',
+        ],
+        [
+            'id' => 'verde-oliva',
+            'name' => 'Verde-oliva',
+        ],
+        [
+            'id' => 'verde-musgo',
+            'name' => 'Verde-musgo',
+        ],
+        [
+            'id' => 'verde-agua',
+            'name' => 'Verde-água',
+        ],
+        [
+            'id' => 'verde-lima',
+            'name' => 'Verde-limão',
+        ],
+        [
+            'id' => 'vermelho-claro',
+            'name' => 'Vermelho-claro',
+        ],
+        [
+            'id' => 'vermelho-escuro',
+            'name' => 'Vermelho-escuro',
+        ],
+        [
+            'id' => 'bordo',
+            'name' => 'Bordô',
+        ],
+        [
+            'id' => 'cobre',
+            'name' => 'Cobre',
+        ],
+        [
+            'id' => 'bronze',
+            'name' => 'Bronze',
+        ],
+        [
+            'id' => 'champagne',
+            'name' => 'Champagne',
+        ],
+        [
+            'id' => 'perolizado',
+            'name' => 'Perolizado',
+        ],
+        [
+            'id' => 'branco-perolizado',
+            'name' => 'Branco perolizado',
+        ],
+        [
+            'id' => 'preto-metalico',
+            'name' => 'Preto metálico',
+        ],
+        [
+            'id' => 'prata-metalica',
+            'name' => 'Prata metálica',
+        ],
+        [
+            'id' => 'cinza-claro',
+            'name' => 'Cinza-claro',
+        ],
+        [
+            'id' => 'cinza-escuro',
+            'name' => 'Cinza-escuro',
+        ],
+        [
+            'id' => 'chumbo',
+            'name' => 'Chumbo',
+        ],
+        [
+            'id' => 'titanio',
+            'name' => 'Titânio',
+        ],
+        [
+            'id' => 'creme',
+            'name' => 'Creme',
+        ],
+        [
+            'id' => 'caramelo',
+            'name' => 'Caramelo',
+        ],
+        [
+            'id' => 'terracota',
+            'name' => 'Terracota',
+        ],
+        [
+            'id' => 'ocre',
+            'name' => 'Ocre',
+        ],
+        [
+            'id' => 'lilas',
+            'name' => 'Lilás',
+        ],
+        [
+            'id' => 'lavanda',
+            'name' => 'Lavanda',
+        ],
+        [
+            'id' => 'magenta',
+            'name' => 'Magenta',
+        ],
+        [
+            'id' => 'rosa-claro',
+            'name' => 'Rosa-claro',
+        ],
+        [
+            'id' => 'rosa-escuro',
+            'name' => 'Rosa-escuro',
+        ],
     ]);
 })->middleware(['auth', 'admin']);
 

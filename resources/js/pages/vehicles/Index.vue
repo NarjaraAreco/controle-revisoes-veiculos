@@ -2,6 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { computed, ref } from 'vue';
 
 interface Vehicle {
     id: number;
@@ -15,9 +16,32 @@ interface Vehicle {
     } | null;
 }
 
-defineProps<{
+const props = defineProps<{
     vehicles: Vehicle[];
 }>();
+
+type SortKey = 'plate' | 'brand' | 'model' | 'year' | 'person';
+const sortKey = ref<SortKey>('plate');
+const sortDirection = ref<'asc' | 'desc'>('asc');
+
+function sortBy(key: SortKey) {
+    if (sortKey.value === key) {
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+        return;
+    }
+
+    sortKey.value = key;
+    sortDirection.value = 'asc';
+}
+
+const sortedVehicles = computed(() => [...props.vehicles].sort((left, right) => {
+    const leftValue = String(sortKey.value === 'person' ? left.person?.name : left[sortKey.value] ?? '').toLocaleLowerCase();
+    const rightValue = String(sortKey.value === 'person' ? right.person?.name : right[sortKey.value] ?? '').toLocaleLowerCase();
+    const result = sortKey.value === 'year'
+        ? Number(left.year) - Number(right.year)
+        : leftValue.localeCompare(rightValue, 'pt-BR');
+    return sortDirection.value === 'asc' ? result : -result;
+}));
 
 const deleteForm = useForm({});
 
@@ -60,22 +84,22 @@ const breadcrumbs: BreadcrumbItem[] = [
                 Nenhum veículo cadastrado.
             </div>
 
-            <div v-else class="overflow-x-auto rounded-lg border">
-                <table class="w-full text-left text-sm">
-                    <thead class="border-b bg-muted/50">
+            <div v-else class="max-h-[32rem] overflow-auto rounded-lg border">
+                <table class="w-full min-w-[950px] text-left text-sm">
+                    <thead class="sticky top-0 z-10 border-b bg-muted/95">
                         <tr>
-                            <th class="px-4 py-3">Placa</th>
-                            <th class="px-4 py-3">Marca</th>
-                            <th class="px-4 py-3">Modelo</th>
-                            <th class="px-4 py-3">Ano</th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('plate')">Placa ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('brand')">Marca ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('model')">Modelo ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('year')">Ano ↕</button></th>
                             <th class="px-4 py-3">Cor</th>
-                            <th class="px-4 py-3">Proprietário</th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('person')">Proprietário ↕</button></th>
                             <th class="px-4 py-3">Ações</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        <tr v-for="vehicle in vehicles" :key="vehicle.id" class="border-b last:border-0">
+                        <tr v-for="vehicle in sortedVehicles" :key="vehicle.id" class="border-b last:border-0">
                             <td class="px-4 py-3">{{ vehicle.plate }}</td>
                             <td class="px-4 py-3">{{ vehicle.brand }}</td>
                             <td class="px-4 py-3">{{ vehicle.model }}</td>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import {
     BookOpen,
@@ -94,6 +94,12 @@ const visibleMainNavItems = computed(() => isClient.value
     : isAdmin.value
         ? mainNavItems
         : mainNavItems.slice(0, 1));
+
+function handleClientLogout() {
+    router.post('/client/logout', {}, {
+        replace: true,
+    });
+}
 </script>
 
 <template>
@@ -120,9 +126,9 @@ const visibleMainNavItems = computed(() => isClient.value
             <SidebarMenu v-else>
                 <SidebarMenuItem>
                     <SidebarMenuButton as-child>
-                        <Link href="/client/logout" method="post" as="button">
+                        <button type="button" class="flex w-full items-center" @click="handleClientLogout">
                             <span>Sair</span>
-                        </Link>
+                        </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>

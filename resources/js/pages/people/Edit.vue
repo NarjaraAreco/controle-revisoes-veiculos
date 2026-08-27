@@ -3,6 +3,16 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { ref } from 'vue';
+import {
+    blockNonNumericKeys,
+    formatCep,
+    formatCpf,
+    formatPhone,
+    formatState,
+    sanitizeDigits,
+    showClientErrors,
+    validatePerson,
+} from '@/lib/clientValidation';
 
 interface Person {
     id: number;
@@ -38,14 +48,14 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const form = useForm({
     name: person.name,
-    cpf: person.cpf,
+    cpf: formatCpf(person.cpf),
     birth_date: person.birth_date
         ? person.birth_date.substring(0, 10)
         : '',
     gender: person.gender ?? '',
-    phone: person.phone ?? '',
+    phone: formatPhone(person.phone ?? ''),
     email: person.email ?? '',
-    cep: person.cep ?? '',
+    cep: formatCep(person.cep ?? ''),
     street: person.street ?? '',
     number: person.number ?? '',
     complement: person.complement ?? '',
@@ -58,10 +68,36 @@ const cepLoading = ref(false);
 const cepError = ref('');
 const cepValidated = ref(Boolean(person.cep));
 
+function sanitizeCpf() {
+    form.cpf = formatCpf(form.cpf);
+}
+
+function blockCpfLetters(event: KeyboardEvent) {
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'];
+
+    if (!event.ctrlKey && !event.metaKey && !allowedKeys.includes(event.key) && !/^\d$/.test(event.key)) {
+        event.preventDefault();
+    }
+}
+
+function pasteCpf(event: ClipboardEvent) {
+    event.preventDefault();
+    form.cpf = formatCpf(`${form.cpf}${event.clipboardData?.getData('text') ?? ''}`);
+}
+
+function sanitizePhone() {
+    form.phone = formatPhone(form.phone);
+}
+
+function sanitizeCep() {
+    form.cep = formatCep(form.cep);
+    cepValidated.value = false;
+}
+
 async function lookupCep() {
     const cep = form.cep.replace(/\D/g, '');
 
-    form.cep = cep;
+    form.cep = formatCep(cep);
     cepValidated.value = false;
     cepError.value = '';
 
@@ -110,6 +146,12 @@ function submit() {
         return;
     }
 
+    const errors = validatePerson(form);
+    if (Object.keys(errors).length > 0) {
+        showClientErrors(errors);
+        return;
+    }
+
     form.put(`/people/${person.id}`);
 }
 </script>
@@ -139,6 +181,7 @@ function submit() {
                         v-model="form.name"
                         type="text"
                         required
+                        maxlength="255"
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                     <p v-if="form.errors.name" class="mt-1 text-sm text-red-500">
@@ -154,10 +197,15 @@ function submit() {
                         id="cpf"
                         v-model="form.cpf"
                         type="text"
+                        inputmode="numeric"
+                        pattern="[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}"
                         required
                         maxlength="14"
                         placeholder="000.000.000-00"
                         class="w-full rounded-md border bg-background px-3 py-2"
+                        @keydown="blockCpfLetters"
+                        @input="sanitizeCpf"
+                        @paste="pasteCpf"
                     />
                     <p v-if="form.errors.cpf" class="mt-1 text-sm text-red-500">
                         {{ form.errors.cpf }}
@@ -203,8 +251,12 @@ function submit() {
                     <input
                         id="phone"
                         v-model="form.phone"
-                        type="tel"
+                        type="text"
+                        inputmode="numeric"
+                        maxlength="15"
                         class="w-full rounded-md border bg-background px-3 py-2"
+                        @keydown="blockNonNumericKeys"
+                        @input="sanitizePhone"
                     />
                 </div>
 
@@ -217,6 +269,7 @@ function submit() {
                         v-model="form.email"
                         type="email"
                         required
+                        maxlength="255"
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>
@@ -229,10 +282,12 @@ function submit() {
                         id="cep"
                         v-model="form.cep"
                         type="text"
+                        inputmode="numeric"
                         maxlength="9"
                         placeholder="00000-000"
                         class="w-full rounded-md border bg-background px-3 py-2"
-                        @input="cepValidated = false"
+                        @keydown="blockNonNumericKeys"
+                        @input="sanitizeCep"
                         @blur="lookupCep"
                     />
                     <p v-if="cepLoading" class="mt-1 text-sm text-muted-foreground">
@@ -252,6 +307,7 @@ function submit() {
                         id="street"
                         v-model="form.street"
                         type="text"
+                        maxlength="255"
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>
@@ -264,6 +320,7 @@ function submit() {
                         id="number"
                         v-model="form.number"
                         type="text"
+                        maxlength="20"
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>
@@ -279,6 +336,7 @@ function submit() {
                         id="complement"
                         v-model="form.complement"
                         type="text"
+                        maxlength="255"
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>
@@ -294,6 +352,7 @@ function submit() {
                         id="neighborhood"
                         v-model="form.neighborhood"
                         type="text"
+                        maxlength="255"
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>
@@ -306,6 +365,7 @@ function submit() {
                         id="city"
                         v-model="form.city"
                         type="text"
+                        maxlength="255"
                         class="w-full rounded-md border bg-background px-3 py-2"
                     />
                 </div>
@@ -320,6 +380,7 @@ function submit() {
                         maxlength="2"
                         placeholder="UF"
                         class="w-full rounded-md border bg-background px-3 py-2"
+                        @input="form.state = formatState(form.state)"
                     />
                 </div>
 

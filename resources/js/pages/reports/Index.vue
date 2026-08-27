@@ -34,6 +34,11 @@ interface PersonReport {
     state: string | null;
 }
 
+interface VehiclesByGender {
+    gender: string;
+    total: number | string;
+}
+
 interface CityReport {
     city: string;
     total: number | string;
@@ -135,7 +140,7 @@ const {
     vehiclesByPerson,
     allVehicles,
     vehiclesByYear,
-    peopleWithMostVehiclesByGender,
+    vehiclesByGender,
     brandsByGender,
     revisionsInPeriod,
     revisionsByMonth,
@@ -153,7 +158,7 @@ const {
     vehiclesByPerson: VehiclesByPerson[];
     allVehicles: VehicleReport[];
     vehiclesByYear: YearReport[];
-    peopleWithMostVehiclesByGender: PersonWithVehicles[];
+    vehiclesByGender: VehiclesByGender[];
     brandsByGender: BrandByGender[];
     revisionsInPeriod: RevisionReport[];
     revisionsByMonth: RevisionByMonth[];
@@ -216,16 +221,121 @@ function formatCost(cost: number | string | null) {
     });
 }
 
-//GRAFICOS ------ BARRA
-const maxVehiclesByBrand = Math.max(
-    ...vehiclesByBrand.map((item) => Number(item.total)),
-    1,
-);
-const maxPeopleWithVehicles = Math.max(
-    ...peopleWithVehicles.map((person) => Number(person.vehicles_count)),
-    1,
-);
+type SortDirection = 'asc' | 'desc';
 
+interface SortState<Key extends string> {
+    key: Key | null;
+    direction: SortDirection;
+}
+
+type PersonSortKey = 'name' | 'cpf' | 'gender' | 'birth_date' | 'contact' | 'city';
+type VehicleSortKey = 'plate' | 'brand' | 'model' | 'year' | 'person';
+type RevisionSortKey = 'revision_date' | 'person' | 'vehicle' | 'maintenance_type' | 'mileage' | 'cost';
+
+const peopleSort = reactive<SortState<PersonSortKey>>({ key: null, direction: 'asc' });
+const vehiclesSort = reactive<SortState<VehicleSortKey>>({ key: null, direction: 'asc' });
+const revisionsSort = reactive<SortState<RevisionSortKey>>({ key: null, direction: 'asc' });
+
+function toggleSort<Key extends string>(state: SortState<Key>, key: Key) {
+    if (state.key === key) {
+        state.direction = state.direction === 'asc' ? 'desc' : 'asc';
+
+        return;
+    }
+
+    state.key = key;
+    state.direction = 'asc';
+}
+
+function sortIndicator<Key extends string>(state: SortState<Key>, key: Key): string {
+    return state.key !== key ? '↕' : state.direction === 'asc' ? '↑' : '↓';
+}
+
+function compareSortValues(left: string | number | null | undefined, right: string | number | null | undefined): number {
+    if (left === null || left === undefined || left === '') {
+        return right === null || right === undefined || right === '' ? 0 : 1;
+    }
+
+    if (right === null || right === undefined || right === '') {
+        return -1;
+    }
+
+    if (typeof left === 'number' && typeof right === 'number') {
+        return left - right;
+    }
+
+    return String(left).localeCompare(String(right), 'pt-BR', {
+        numeric: true,
+        sensitivity: 'base',
+    });
+}
+
+function sortedItems<T, Key extends string>(
+    items: T[],
+    state: SortState<Key>,
+    getValue: (item: T, key: Key) => string | number | null | undefined,
+): T[] {
+    if (!state.key) {
+        return items;
+    }
+
+    return [...items].sort((left, right) => {
+        const result = compareSortValues(getValue(left, state.key as Key), getValue(right, state.key as Key));
+
+        return state.direction === 'asc' ? result : -result;
+    });
+}
+
+const sortedPeople = computed(() => sortedItems(allPeople, peopleSort, (person, key) => {
+    switch (key) {
+        case 'cpf':
+            return person.cpf;
+        case 'gender':
+            return person.gender;
+        case 'birth_date':
+            return person.birth_date;
+        case 'contact':
+            return `${person.phone ?? ''} ${person.email ?? ''}`;
+        case 'city':
+            return `${person.city ?? ''} ${person.state ?? ''}`;
+        default:
+            return person.name;
+    }
+}));
+
+const sortedVehicles = computed(() => sortedItems(allVehicles, vehiclesSort, (vehicle, key) => {
+    switch (key) {
+        case 'brand':
+            return vehicle.brand;
+        case 'model':
+            return vehicle.model;
+        case 'year':
+            return vehicle.year;
+        case 'person':
+            return vehicle.person?.name;
+        default:
+            return vehicle.plate;
+    }
+}));
+
+const sortedRevisions = computed(() => sortedItems(revisionsInPeriod, revisionsSort, (revision, key) => {
+    switch (key) {
+        case 'person':
+            return revision.vehicle.person?.name;
+        case 'vehicle':
+            return `${revision.vehicle.plate} ${revision.vehicle.brand} ${revision.vehicle.model}`;
+        case 'maintenance_type':
+            return formatMaintenanceType(revision.maintenance_type);
+        case 'mileage':
+            return revision.mileage;
+        case 'cost':
+            return revision.cost === null ? null : Number(revision.cost);
+        default:
+            return revision.revision_date;
+    }
+}));
+
+//GRAFICOS ------ BARRA
 const maxPeopleByGender = Math.max(
     ...peopleByGender.map((item) => Number(item.total)),
     1,
@@ -236,25 +346,8 @@ const maxVehiclesByPerson = Math.max(
     1,
 );
 
-const maxMostVehiclesByGender = Math.max(
-    ...peopleWithMostVehiclesByGender.map((person) =>
-        Number(person.vehicles_count),
-    ),
-    1,
-);
-
 const maxBrandsByGender = Math.max(
     ...brandsByGender.map((item) => Number(item.total)),
-    1,
-);
-
-const maxRevisionsByBrand = Math.max(
-    ...revisionsByBrand.map((item) => Number(item.total)),
-    1,
-);
-
-const maxPeopleByRevisionCount = Math.max(
-    ...peopleByRevisionCount.map((item) => Number(item.total)),
     1,
 );
 
@@ -304,6 +397,90 @@ function formatMonth(month: string): string {
     }).format(new Date(year, monthNumber - 1, 1));
 }
 
+interface ChartSegment {
+    label: string;
+    value: number;
+    percent: number;
+    color: string;
+}
+
+const chartColors = [
+    'var(--chart-1)',
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
+    'var(--chart-5)',
+    'var(--chart-6)',
+    'var(--chart-7)',
+    'var(--chart-8)',
+    'var(--chart-9)',
+    'var(--chart-10)',
+];
+
+function chartSegments(items: Array<{ label: string; value: number }>): ChartSegment[] {
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    if (!total) {
+        return [];
+    }
+
+    return items.map((item, index) => ({
+        ...item,
+        percent: (item.value / total) * 100,
+        color: chartColors[index % chartColors.length],
+    }));
+}
+
+function pieGradient(segments: ChartSegment[]): string {
+    let cursor = 0;
+
+    return segments.length
+        ? `conic-gradient(${segments.map((segment) => {
+            const start = cursor;
+            cursor += segment.percent;
+            return `${segment.color} ${start}% ${cursor}%`;
+        }).join(', ')})`
+        : 'var(--muted)';
+}
+
+const revisionsByBrandChart = computed(() => chartSegments(
+    revisionsByBrand.map((item) => ({
+        label: item.brand,
+        value: Number(item.total),
+    })),
+));
+
+const peopleByRevisionChart = computed(() => chartSegments(
+    peopleByRevisionCount.map((person) => ({
+        label: person.name,
+        value: Number(person.total),
+    })),
+));
+
+const vehiclesByBrandChart = computed(() => chartSegments(
+    vehiclesByBrand.map((item) => ({
+        label: item.brand,
+        value: Number(item.total),
+    })),
+));
+
+const peopleWithVehiclesChart = computed(() => chartSegments(
+    peopleWithVehicles.filter((person) => Number(person.vehicles_count) > 0).map((person) => ({
+        label: person.name,
+        value: Number(person.vehicles_count),
+    })),
+));
+
+const vehiclesByGenderChart = computed(() => chartSegments(
+    vehiclesByGender.map((item) => ({
+        label: item.gender,
+        value: Number(item.total),
+    })),
+));
+
+const totalVehiclesByGender = computed(() => vehiclesByGenderChart.value
+    .reduce((total, item) => total + item.value, 0));
+
 </script>
 
 <template>
@@ -325,12 +502,6 @@ function formatMonth(month: string): string {
                     <span class="text-xl transition-transform group-open:rotate-90">&gt;</span>
                 </summary>
             <section class="space-y-4">
-                <div class="border-b pb-2">
-                    <h2 class="text-xl font-semibold">Revisões</h2>
-                    <p class="text-sm text-muted-foreground">
-                        Consulte as revisões por período, marca e pessoa.
-                    </p>
-                </div>
             <form class="grid gap-4 rounded-xl border p-5 md:grid-cols-3" @submit.prevent="filterRevisions">
                 <div>
                     <label for="start_date" class="mb-2 block text-sm font-medium">
@@ -399,21 +570,45 @@ function formatMonth(month: string): string {
                     Nenhuma revisão encontrada para o período informado.
                 </p>
 
-                <div v-else class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="border-b bg-muted/50">
+                <div v-else class="max-h-[32rem] overflow-auto">
+                    <table class="w-full min-w-[900px] text-left text-sm">
+                        <thead class="sticky top-0 z-10 border-b bg-muted/95">
                             <tr>
-                                <th class="px-5 py-3">Data</th>
-                                <th class="px-5 py-3">Pessoa</th>
-                                <th class="px-5 py-3">Veículo</th>
-                                <th class="px-5 py-3">Tipo</th>
-                                <th class="px-5 py-3">Quilometragem</th>
-                                <th class="px-5 py-3">Custo</th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(revisionsSort, 'revision_date')">
+                                        Data <span aria-hidden="true">{{ sortIndicator(revisionsSort, 'revision_date') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(revisionsSort, 'person')">
+                                        Pessoa <span aria-hidden="true">{{ sortIndicator(revisionsSort, 'person') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(revisionsSort, 'vehicle')">
+                                        Veículo <span aria-hidden="true">{{ sortIndicator(revisionsSort, 'vehicle') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(revisionsSort, 'maintenance_type')">
+                                        Tipo <span aria-hidden="true">{{ sortIndicator(revisionsSort, 'maintenance_type') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(revisionsSort, 'mileage')">
+                                        Quilometragem <span aria-hidden="true">{{ sortIndicator(revisionsSort, 'mileage') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(revisionsSort, 'cost')">
+                                        Custo <span aria-hidden="true">{{ sortIndicator(revisionsSort, 'cost') }}</span>
+                                    </button>
+                                </th>
                             </tr>
                         </thead>
 
                         <tbody>
-                            <tr v-for="revision in revisionsInPeriod" :key="revision.id" class="border-b last:border-0">
+                            <tr v-for="revision in sortedRevisions" :key="revision.id" class="border-b last:border-0">
                                 <td class="px-5 py-3">
                                     {{ formatDate(revision.revision_date) }}
                                 </td>
@@ -445,64 +640,51 @@ function formatMonth(month: string): string {
                     </table>
                 </div>
             </section>
-            <section class="rounded-xl border">
-                <div class="border-b p-5">
-                    <h2 class="font-semibold">
-                        Marcas com mais revisões
-                    </h2>
-                </div>
-
-                <div v-if="revisionsByBrand.length > 0" class="space-y-5 p-5">
-                    <div v-for="item in revisionsByBrand" :key="item.brand">
-                        <div class="mb-1 flex justify-between text-sm">
-                            <span>{{ item.brand }}</span>
-                            <span>{{ item.total }}</span>
-                        </div>
-
-                        <div class="h-3 overflow-hidden rounded-full bg-muted">
-                            <div class="h-full rounded-full bg-primary transition-all" :style="{
-                                width: `${(Number(item.total) / maxRevisionsByBrand) * 100}%`,
-                            }"></div>
-                        </div>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <section class="rounded-xl border">
+                    <div class="border-b p-5">
+                        <h2 class="font-semibold">Marcas com mais revisões</h2>
                     </div>
-                </div>
 
-                <p v-else class="p-5 text-muted-foreground">
-                    Nenhuma revisão encontrada no período.
-                </p>
-            </section>
-            <section class="rounded-xl border">
-                <div class="border-b p-5">
-                    <h2 class="font-semibold">
-                        Pessoas com mais revisões
-                    </h2>
-                </div>
-
-                <div v-if="peopleByRevisionCount.length > 0" class="space-y-5 p-5">
-                    <div v-for="person in peopleByRevisionCount" :key="person.id">
-                        <div class="mb-1 flex justify-between text-sm">
-                            <span>
-                                {{ person.name }}
-                                <span v-if="person.gender" class="text-muted-foreground">
-                                    ({{ person.gender }})
+                    <div v-if="revisionsByBrandChart.length > 0" class="grid gap-6 p-5 sm:grid-cols-[minmax(12rem,16rem)_1fr] sm:items-center">
+                        <div class="mx-auto aspect-square w-full max-w-56 rounded-full" role="img" aria-label="Gráfico de pizza de revisões por marca"
+                            :style="{ background: pieGradient(revisionsByBrandChart) }" />
+                        <div class="space-y-2">
+                            <div v-for="item in revisionsByBrandChart" :key="item.label" class="flex items-center justify-between gap-3 text-sm">
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <span class="size-3 shrink-0 rounded-full" :style="{ backgroundColor: item.color }" />
+                                    <span class="truncate">{{ item.label }}</span>
                                 </span>
-                            </span>
-
-                            <span>{{ person.total }}</span>
-                        </div>
-
-                        <div class="h-3 overflow-hidden rounded-full bg-muted">
-                            <div class="h-full rounded-full bg-primary transition-all" :style="{
-                                width: `${(Number(person.total) / maxPeopleByRevisionCount) * 100}%`,
-                            }"></div>
+                                <span class="font-medium">{{ item.value }} ({{ item.percent.toFixed(1) }}%)</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <p v-else class="p-5 text-muted-foreground">
-                    Nenhuma pessoa possui revisões no período.
-                </p>
-            </section>
+                    <p v-else class="p-5 text-muted-foreground">Nenhuma revisão encontrada no período.</p>
+                </section>
+
+                <section class="rounded-xl border">
+                    <div class="border-b p-5">
+                        <h2 class="font-semibold">Pessoas com mais revisões</h2>
+                    </div>
+
+                    <div v-if="peopleByRevisionChart.length > 0" class="grid gap-6 p-5 sm:grid-cols-[minmax(12rem,16rem)_1fr] sm:items-center">
+                        <div class="mx-auto aspect-square w-full max-w-56 rounded-full" role="img" aria-label="Gráfico de pizza de pessoas com mais revisões"
+                            :style="{ background: pieGradient(peopleByRevisionChart) }" />
+                        <div class="max-h-56 space-y-2 overflow-auto pr-1">
+                            <div v-for="item in peopleByRevisionChart" :key="`chart-revision-person-${item.label}`" class="flex items-center justify-between gap-3 text-sm">
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <span class="size-3 shrink-0 rounded-full" :style="{ backgroundColor: item.color }" />
+                                    <span class="truncate">{{ item.label }}</span>
+                                </span>
+                                <span class="font-medium">{{ item.value }} ({{ item.percent.toFixed(1) }}%)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p v-else class="p-5 text-muted-foreground">Nenhuma pessoa possui revisões no período.</p>
+                </section>
+            </div>
             <section class="rounded-xl border">
                 <div class="border-b p-5">
                     <h2 class="font-semibold">
@@ -547,56 +729,23 @@ function formatMonth(month: string): string {
 
                 <div v-if="nextRevisions.length > 0" class="border-b p-5">
                     <div class="mb-4 flex items-center justify-between">
-                        <h3 class="font-semibold">Distância até a próxima revisão</h3>
-                        <span class="text-xs text-muted-foreground">Dias previstos</span>
+                        <h3 class="font-semibold">Dias até a próxima revisão</h3>
+                        <span class="text-xs text-muted-foreground">Quanto menor, mais próxima</span>
                     </div>
 
-                    <div class="space-y-4">
-                        <div v-for="item in nextRevisions" :key="`chart-next-${item.person_id}`">
-                            <div class="mb-1 flex justify-between gap-4 text-sm">
-                                <span class="truncate">{{ item.name }}</span>
-                                <span>{{ daysUntil(item.next_revision_date) }} dias</span>
+                    <div class="max-h-[28rem] space-y-3 overflow-auto pr-1">
+                        <div v-for="item in nextRevisions" :key="`chart-next-${item.person_id}`" class="grid grid-cols-[minmax(7rem,11rem)_1fr_auto] items-center gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium">{{ item.name }}</p>
+                                <p class="text-xs text-muted-foreground">{{ formatDate(item.next_revision_date) }}</p>
                             </div>
-                            <div class="h-3 overflow-hidden rounded-full bg-muted">
-                                <div
-                                    class="h-full rounded-full bg-primary"
-                                    :style="{ width: `${(daysUntil(item.next_revision_date) / maxNextRevisionDays) * 100}%` }"
-                                />
+                            <div class="h-3 overflow-hidden rounded-full bg-muted" role="img" :aria-label="`${item.name}: ${daysUntil(item.next_revision_date)} dias até a revisão`">
+                                <div class="h-full rounded-full bg-primary transition-all"
+                                    :style="{ width: `${(daysUntil(item.next_revision_date) / maxNextRevisionDays) * 100}%`, minWidth: '8px' }" />
                             </div>
+                            <span class="whitespace-nowrap text-sm font-medium">{{ daysUntil(item.next_revision_date) }} d</span>
                         </div>
                     </div>
-                </div>
-
-                <div v-if="nextRevisions.length > 0" class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="border-b bg-muted/50">
-                            <tr>
-                                <th class="px-5 py-3">Pessoa</th>
-                                <th class="px-5 py-3">Última revisão</th>
-                                <th class="px-5 py-3">Média</th>
-                                <th class="px-5 py-3">Próxima revisão prevista</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            <tr
-                                v-for="item in nextRevisions"
-                                :key="item.person_id"
-                                class="border-b last:border-0"
-                            >
-                                <td class="px-5 py-3">{{ item.name }}</td>
-                                <td class="px-5 py-3">
-                                    {{ formatDate(item.last_revision_date) }}
-                                </td>
-                                <td class="px-5 py-3">
-                                    {{ Number(item.average_days).toFixed(1) }} dias
-                                </td>
-                                <td class="px-5 py-3 font-semibold">
-                                    {{ formatDate(item.next_revision_date) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
                 </div>
 
                 <p v-else class="p-5 text-muted-foreground">
@@ -611,55 +760,26 @@ function formatMonth(month: string): string {
                     <span class="text-xl transition-transform group-open:rotate-90">&gt;</span>
                 </summary>
             <section class="space-y-4">
-                <div class="border-b pb-2">
-                    <h2 class="text-xl font-semibold">Indicadores de veículos e pessoas</h2>
-                    <p class="text-sm text-muted-foreground">
-                        Comparativo geral entre proprietários, veículos e marcas.
-                    </p>
-                </div>
             <div class="grid gap-6 lg:grid-cols-2">
                 <section class="rounded-xl border">
                     <div class="border-b p-5">
                         <h2 class="font-semibold">Veículos por marca</h2>
                     </div>
-                    <div v-if="vehiclesByBrand.length > 0" class="space-y-4 border-b p-5">
-                        <div v-for="item in vehiclesByBrand" :key="`chart-${item.brand}`">
-                            <div class="mb-1 flex justify-between text-sm">
-                                <span>{{ item.brand }}</span>
-                                <span>{{ item.total }}</span>
-                            </div>
-
-                            <div class="h-3 overflow-hidden rounded-full bg-muted">
-                                <div class="h-full rounded-full bg-primary transition-all" :style="{
-                                    width: `${(Number(item.total) / maxVehiclesByBrand) * 100}%`,
-                                }"></div>
+                    <div v-if="vehiclesByBrandChart.length > 0" class="grid gap-6 p-5 sm:grid-cols-[minmax(12rem,16rem)_1fr] sm:items-center">
+                        <div class="mx-auto aspect-square w-full max-w-56 rounded-full" role="img" aria-label="Gráfico de pizza de veículos por marca"
+                            :style="{ background: pieGradient(vehiclesByBrandChart) }" />
+                        <div class="space-y-2">
+                            <div v-for="item in vehiclesByBrandChart" :key="`chart-${item.label}`" class="flex items-center justify-between gap-3 text-sm">
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <span class="size-3 shrink-0 rounded-full" :style="{ backgroundColor: item.color }" />
+                                    <span class="truncate">{{ item.label }}</span>
+                                </span>
+                                <span class="font-medium">{{ item.value }} ({{ item.percent.toFixed(1) }}%)</span>
                             </div>
                         </div>
                     </div>
                     <div v-if="vehiclesByBrand.length === 0" class="p-5 text-muted-foreground">
                         Nenhum veículo cadastrado.
-                    </div>
-
-                    <div v-else class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="border-b bg-muted/50">
-                                <tr>
-                                    <th class="px-5 py-3">Marca</th>
-                                    <th class="px-5 py-3">Quantidade</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                <tr v-for="item in vehiclesByBrand" :key="item.brand" class="border-b last:border-0">
-                                    <td class="px-5 py-3">
-                                        {{ item.brand }}
-                                    </td>
-                                    <td class="px-5 py-3">
-                                        {{ item.total }}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
                     </div>
                 </section>
 
@@ -667,45 +787,21 @@ function formatMonth(month: string): string {
                     <div class="border-b p-5">
                         <h2 class="font-semibold">Pessoas com mais veículos</h2>
                     </div>
-                    <div v-if="peopleWithVehicles.length > 0" class="space-y-4 border-b p-5">
-                        <div v-for="person in peopleWithVehicles" :key="`chart-person-${person.id}`">
-                            <div class="mb-1 flex justify-between text-sm">
-                                <span>{{ person.name }}</span>
-                                <span>{{ person.vehicles_count }}</span>
-                            </div>
-
-                            <div class="h-3 overflow-hidden rounded-full bg-muted">
-                                <div class="h-full rounded-full bg-primary transition-all" :style="{
-                                    width: `${(Number(person.vehicles_count) / maxPeopleWithVehicles) * 100}%`,
-                                }"></div>
+                    <div v-if="peopleWithVehiclesChart.length > 0" class="grid gap-6 p-5 sm:grid-cols-[minmax(12rem,16rem)_1fr] sm:items-center">
+                        <div class="mx-auto aspect-square w-full max-w-56 rounded-full" role="img" aria-label="Gráfico de pizza de pessoas com mais veículos"
+                            :style="{ background: pieGradient(peopleWithVehiclesChart) }" />
+                        <div class="space-y-2">
+                            <div v-for="item in peopleWithVehiclesChart" :key="`chart-person-${item.label}`" class="flex items-center justify-between gap-3 text-sm">
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <span class="size-3 shrink-0 rounded-full" :style="{ backgroundColor: item.color }" />
+                                    <span class="truncate">{{ item.label }}</span>
+                                </span>
+                                <span class="font-medium">{{ item.value }} ({{ item.percent.toFixed(1) }}%)</span>
                             </div>
                         </div>
                     </div>
-                    <div v-if="peopleWithVehicles.length === 0" class="p-5 text-muted-foreground">
+                    <div v-if="peopleWithVehiclesChart.length === 0" class="p-5 text-muted-foreground">
                         Nenhuma pessoa cadastrada.
-                    </div>
-
-                    <div v-else class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="border-b bg-muted/50">
-                                <tr>
-                                    <th class="px-5 py-3">Pessoa</th>
-                                    <th class="px-5 py-3">Veículos</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                <tr v-for="person in peopleWithVehicles" :key="person.id"
-                                    class="border-b last:border-0">
-                                    <td class="px-5 py-3">
-                                        {{ person.name }}
-                                    </td>
-                                    <td class="px-5 py-3">
-                                        {{ person.vehicles_count }}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
                     </div>
                 </section>
             </div>
@@ -717,12 +813,6 @@ function formatMonth(month: string): string {
                     <span class="text-xl transition-transform group-open:rotate-90">&gt;</span>
                 </summary>
             <section class="space-y-4">
-                <div class="border-b pb-2">
-                    <h2 class="text-xl font-semibold">Pessoas</h2>
-                    <p class="text-sm text-muted-foreground">
-                        Indicadores relacionados aos proprietários cadastrados.
-                    </p>
-                </div>
             <section class="rounded-xl border">
                 <div class="border-b p-5">
                     <h2 class="font-semibold">Todas as pessoas</h2>
@@ -737,18 +827,12 @@ function formatMonth(month: string): string {
                         <span class="text-xs text-muted-foreground">Quantidade</span>
                     </div>
 
-                    <div class="space-y-4">
-                        <div v-for="item in peopleByCity" :key="item.city">
-                            <div class="mb-1 flex justify-between gap-4 text-sm">
-                                <span class="truncate">{{ item.city }}</span>
-                                <span>{{ item.total }}</span>
-                            </div>
-                            <div class="h-3 overflow-hidden rounded-full bg-muted">
-                                <div
-                                    class="h-full rounded-full bg-primary"
-                                    :style="{ width: `${(Number(item.total) / maxPeopleByCity) * 100}%` }"
-                                />
-                            </div>
+                    <div class="flex h-64 items-end gap-1 overflow-x-auto border-b border-l px-3 pb-2 pt-8">
+                        <div v-for="item in peopleByCity" :key="item.city" class="flex min-w-14 flex-1 flex-col items-center justify-end gap-2">
+                            <span class="text-sm font-medium">{{ item.total }}</span>
+                            <div class="w-full max-w-10 rounded-t-md bg-primary" role="img" :aria-label="`${item.city}: ${item.total} pessoa(s)`"
+                                :style="{ height: `${(Number(item.total) / maxPeopleByCity) * 100}%`, minHeight: '8px' }" />
+                            <span class="max-w-20 truncate text-center text-xs text-muted-foreground">{{ item.city }}</span>
                         </div>
                     </div>
                 </div>
@@ -757,22 +841,46 @@ function formatMonth(month: string): string {
                     Nenhuma pessoa cadastrada.
                 </p>
 
-                <div v-else class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="border-b bg-muted/50">
+                <div v-else class="max-h-[22rem] overflow-auto">
+                    <table class="w-full min-w-[900px] text-left text-sm">
+                        <thead class="sticky top-0 z-10 border-b bg-muted/95">
                             <tr>
-                                <th class="px-5 py-3">Nome</th>
-                                <th class="px-5 py-3">CPF</th>
-                                <th class="px-5 py-3">Gênero</th>
-                                <th class="px-5 py-3">Nascimento</th>
-                                <th class="px-5 py-3">Contato</th>
-                                <th class="px-5 py-3">Cidade/UF</th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(peopleSort, 'name')">
+                                        Nome <span aria-hidden="true">{{ sortIndicator(peopleSort, 'name') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(peopleSort, 'cpf')">
+                                        CPF <span aria-hidden="true">{{ sortIndicator(peopleSort, 'cpf') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(peopleSort, 'gender')">
+                                        Gênero <span aria-hidden="true">{{ sortIndicator(peopleSort, 'gender') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(peopleSort, 'birth_date')">
+                                        Nascimento <span aria-hidden="true">{{ sortIndicator(peopleSort, 'birth_date') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(peopleSort, 'contact')">
+                                        Contato <span aria-hidden="true">{{ sortIndicator(peopleSort, 'contact') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(peopleSort, 'city')">
+                                        Cidade/UF <span aria-hidden="true">{{ sortIndicator(peopleSort, 'city') }}</span>
+                                    </button>
+                                </th>
                             </tr>
                         </thead>
 
                         <tbody>
                             <tr
-                                v-for="person in allPeople"
+                                v-for="person in sortedPeople"
                                 :key="person.id"
                                 class="border-b last:border-0"
                             >
@@ -813,7 +921,7 @@ function formatMonth(month: string): string {
                         </div>
 
                         <div class="h-3 overflow-hidden rounded-full bg-muted">
-                            <div class="h-full rounded-full bg-primary transition-all" :style="{
+                            <div class="h-full rounded-full bg-gradient-to-r from-primary to-blue-400 transition-all" role="progressbar" :style="{
                                 width: `${(Number(item.total) / maxPeopleByGender) * 100}%`,
                             }"></div>
                         </div>
@@ -840,32 +948,28 @@ function formatMonth(month: string): string {
                     </h2>
                 </div>
 
-                <div v-if="peopleWithMostVehiclesByGender.length > 0" class="grid gap-6 p-5 md:grid-cols-2">
-                    <div v-for="person in peopleWithMostVehiclesByGender" :key="person.id" class="space-y-3">
-                        <div class="flex justify-between text-sm">
-                            <span>
-                                {{ person.gender }}
-                            </span>
-
-                            <span>
-                                {{ person.vehicles_count }} veículo(s)
-                            </span>
-                        </div>
-
-                        <p class="font-semibold">
-                            {{ person.name }}
-                        </p>
-
-                        <div class="h-3 overflow-hidden rounded-full bg-muted">
-                            <div class="h-full rounded-full bg-primary transition-all" :style="{
-                                width: `${(Number(person.vehicles_count) / maxMostVehiclesByGender) * 100}%`,
-                            }"></div>
+                <div v-if="vehiclesByGenderChart.length > 0" class="space-y-4 p-5">
+                    <div class="flex h-12 w-full overflow-hidden rounded-md bg-muted" role="img" aria-label="Comparação de veículos por gênero">
+                        <div v-for="item in vehiclesByGenderChart" :key="item.label" class="flex items-center justify-center px-3 text-sm font-medium text-primary-foreground transition-all"
+                            :style="{ width: `${item.percent}%`, backgroundColor: item.color, minWidth: item.percent > 0 ? '4rem' : '0' }">
+                            <span class="truncate">{{ item.label }}: {{ item.value }}</span>
                         </div>
                     </div>
+
+                    <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                        <div v-for="item in vehiclesByGenderChart" :key="`legend-${item.label}`" class="flex items-center gap-2">
+                            <span class="size-3 rounded-full" :style="{ backgroundColor: item.color }" />
+                            <span>{{ item.label }}: {{ item.value }} veículo(s) ({{ item.percent.toFixed(1) }}%)</span>
+                        </div>
+                    </div>
+
+                    <p class="text-sm text-muted-foreground">
+                        Total: {{ totalVehiclesByGender }} veículo(s). O maior segmento indica o gênero com mais veículos.
+                    </p>
                 </div>
 
                 <p v-else class="p-5 text-muted-foreground">
-                    Não existem dados suficientes para esse relatório.
+                    Não existem veículos vinculados a pessoas com gênero informado.
                 </p>
             </section>
             </section>
@@ -876,12 +980,6 @@ function formatMonth(month: string): string {
                     <span class="text-xl transition-transform group-open:rotate-90">&gt;</span>
                 </summary>
             <section class="space-y-4">
-                <div class="border-b pb-2">
-                    <h2 class="text-xl font-semibold">Veículos</h2>
-                    <p class="text-sm text-muted-foreground">
-                        Informações sobre os veículos e suas marcas.
-                    </p>
-                </div>
             <section class="rounded-xl border">
                 <div class="border-b p-5">
                     <h2 class="font-semibold">Todos os veículos</h2>
@@ -890,9 +988,64 @@ function formatMonth(month: string): string {
                     </p>
                 </div>
 
-                <div v-if="vehiclesByYear.length" class="border-b p-5">
+                <div v-if="allVehicles.length" class="max-h-[22rem] overflow-auto">
+                    <table class="w-full min-w-[800px] text-left text-sm">
+                        <thead class="sticky top-0 z-10 border-b bg-muted/95">
+                            <tr>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(vehiclesSort, 'plate')">
+                                        Placa <span aria-hidden="true">{{ sortIndicator(vehiclesSort, 'plate') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(vehiclesSort, 'brand')">
+                                        Marca <span aria-hidden="true">{{ sortIndicator(vehiclesSort, 'brand') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(vehiclesSort, 'model')">
+                                        Modelo <span aria-hidden="true">{{ sortIndicator(vehiclesSort, 'model') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(vehiclesSort, 'year')">
+                                        Ano <span aria-hidden="true">{{ sortIndicator(vehiclesSort, 'year') }}</span>
+                                    </button>
+                                </th>
+                                <th class="px-5 py-3">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-primary" @click="toggleSort(vehiclesSort, 'person')">
+                                        Proprietário <span aria-hidden="true">{{ sortIndicator(vehiclesSort, 'person') }}</span>
+                                    </button>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="vehicle in sortedVehicles" :key="vehicle.id" class="border-b last:border-0">
+                                <td class="px-5 py-3">{{ vehicle.plate }}</td>
+                                <td class="px-5 py-3">{{ vehicle.brand }}</td>
+                                <td class="px-5 py-3">{{ vehicle.model }}</td>
+                                <td class="px-5 py-3">{{ vehicle.year }}</td>
+                                <td class="px-5 py-3">{{ vehicle.person?.name ?? 'Não informado' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p v-else class="p-5 text-muted-foreground">
+                    Nenhum veículo cadastrado.
+                </p>
+            </section>
+            <section class="rounded-xl border">
+                <div class="border-b p-5">
+                    <h2 class="font-semibold">Veículos por ano</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Quantidade de veículos agrupada por ano.
+                    </p>
+                </div>
+
+                <div v-if="vehiclesByYear.length" class="p-5">
                     <div class="mb-4 flex items-center justify-between">
-                        <h3 class="font-semibold">Veículos por ano</h3>
+                        <h3 class="font-semibold">Distribuição anual</h3>
                         <span class="text-xs text-muted-foreground">Quantidade</span>
                     </div>
 
@@ -912,31 +1065,8 @@ function formatMonth(month: string): string {
                     </div>
                 </div>
 
-                <div v-if="allVehicles.length" class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="border-b bg-muted/50">
-                            <tr>
-                                <th class="px-5 py-3">Placa</th>
-                                <th class="px-5 py-3">Marca</th>
-                                <th class="px-5 py-3">Modelo</th>
-                                <th class="px-5 py-3">Ano</th>
-                                <th class="px-5 py-3">Proprietário</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="vehicle in allVehicles" :key="vehicle.id" class="border-b last:border-0">
-                                <td class="px-5 py-3">{{ vehicle.plate }}</td>
-                                <td class="px-5 py-3">{{ vehicle.brand }}</td>
-                                <td class="px-5 py-3">{{ vehicle.model }}</td>
-                                <td class="px-5 py-3">{{ vehicle.year }}</td>
-                                <td class="px-5 py-3">{{ vehicle.person?.name ?? 'Não informado' }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
                 <p v-else class="p-5 text-muted-foreground">
-                    Nenhum veículo cadastrado.
+                    Nenhum veículo cadastrado para agrupar por ano.
                 </p>
             </section>
             <section class="rounded-xl border">
@@ -948,54 +1078,14 @@ function formatMonth(month: string): string {
                     </p>
                 </div>
 
-                <div v-if="vehiclesByPerson.length > 0" class="divide-y">
-                    <div v-for="person in vehiclesByPerson" :key="person.id" class="space-y-4 p-5">
-                        <div class="flex justify-between">
-                            <h3 class="font-semibold">
-                                {{ person.name }}
-                            </h3>
-
-                            <span class="text-sm text-muted-foreground">
-                                {{ person.vehicles.length }} veículo(s)
-                            </span>
+                <div v-if="vehiclesByPerson.length > 0" class="max-h-[28rem] space-y-3 overflow-auto p-5">
+                    <div v-for="person in vehiclesByPerson" :key="person.id" class="grid grid-cols-[minmax(7rem,11rem)_1fr_auto] items-center gap-3">
+                        <span class="truncate text-sm font-medium">{{ person.name }}</span>
+                        <div class="h-3 overflow-hidden rounded-full bg-muted" role="img" :aria-label="`${person.name}: ${person.vehicles.length} veículo(s)`">
+                            <div class="h-full rounded-full bg-primary transition-all"
+                                :style="{ width: `${(person.vehicles.length / maxVehiclesByPerson) * 100}%`, minWidth: '8px' }" />
                         </div>
-
-                        <div class="h-3 overflow-hidden rounded-full bg-muted">
-                            <div class="h-full rounded-full bg-primary transition-all" :style="{
-                                width: `${(person.vehicles.length / maxVehiclesByPerson) * 100}%`,
-                            }"></div>
-                        </div>
-
-                        <div class="overflow-x-auto rounded-lg border">
-                            <table class="w-full text-left text-sm">
-                                <thead class="border-b bg-muted/50">
-                                    <tr>
-                                        <th class="px-4 py-3">Placa</th>
-                                        <th class="px-4 py-3">Marca</th>
-                                        <th class="px-4 py-3">Modelo</th>
-                                        <th class="px-4 py-3">Ano</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    <tr v-for="vehicle in person.vehicles" :key="vehicle.id"
-                                        class="border-b last:border-0">
-                                        <td class="px-4 py-3">
-                                            {{ vehicle.plate }}
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            {{ vehicle.brand }}
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            {{ vehicle.model }}
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            {{ vehicle.year }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <span class="whitespace-nowrap text-sm text-muted-foreground">{{ person.vehicles.length }}</span>
                     </div>
                 </div>
 

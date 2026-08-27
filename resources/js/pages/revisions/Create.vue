@@ -2,6 +2,17 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { computed } from 'vue';
+import {
+    blockDecimalKeys,
+    blockNonNumericKeys,
+    formatCost,
+    formatMileage,
+    normalizeCost,
+    normalizeMileage,
+    showClientErrors,
+    validateRevision,
+} from '@/lib/clientValidation';
 
 interface Vehicle {
     id: number;
@@ -29,6 +40,18 @@ const form = useForm({
     next_revision_date: '',
 });
 
+function maskMileage() {
+    form.mileage = formatMileage(form.mileage);
+}
+
+function maskCost() {
+    form.cost = formatCost(form.cost);
+}
+
+const selectedVehicle = computed(() =>
+    vehicles.find((vehicle) => String(vehicle.id) === form.vehicle_id),
+);
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Revisões',
@@ -41,7 +64,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 function submit() {
-    form.post('/revisions');
+    const errors = validateRevision(form);
+    if (Object.keys(errors).length > 0) {
+        showClientErrors(errors);
+        return;
+    }
+
+    form.transform((data) => ({
+        ...data,
+        mileage: normalizeMileage(data.mileage),
+        cost: normalizeCost(data.cost),
+    })).post('/revisions');
 }
 </script>
 
@@ -78,6 +111,10 @@ function submit() {
                         </option>
                     </select>
 
+                    <p v-if="selectedVehicle" class="mt-1 text-sm text-muted-foreground">
+                        Proprietário: {{ selectedVehicle.person?.name || 'Sem proprietário' }}
+                    </p>
+
                     <p v-if="form.errors.vehicle_id" class="mt-1 text-sm text-red-500">
                         {{ form.errors.vehicle_id }}
                     </p>
@@ -103,7 +140,7 @@ function submit() {
                         Data da revisão
                     </label>
 
-                    <input id="revision_date" v-model="form.revision_date" type="date" required
+                    <input id="revision_date" v-model="form.revision_date" type="date" required :max="today"
                         class="w-full rounded-md border bg-background px-3 py-2" />
 
                     <p v-if="form.errors.revision_date" class="mt-1 text-sm text-red-500">
@@ -116,7 +153,8 @@ function submit() {
                         Quilometragem
                     </label>
 
-                    <input id="mileage" v-model="form.mileage" type="number" min="0" required placeholder="Ex.: 45000"
+                    <input id="mileage" v-model="form.mileage" type="text" min="0" maxlength="13" required pattern="(?:[0-9]{1,3}(?:\.[0-9]{3})*|[0-9]{1,10})" placeholder="Ex.: 45.000"
+                        inputmode="numeric" @keydown="blockNonNumericKeys" @input="maskMileage"
                         class="w-full rounded-md border bg-background px-3 py-2" />
 
                     <p v-if="form.errors.mileage" class="mt-1 text-sm text-red-500">
@@ -129,7 +167,7 @@ function submit() {
                         Descrição dos serviços
                     </label>
 
-                    <textarea id="description" v-model="form.description" required rows="5"
+                    <textarea id="description" v-model="form.description" required maxlength="2000" rows="5"
                         placeholder="Descreva os serviços realizados..."
                         class="w-full rounded-md border bg-background px-3 py-2"></textarea>
 
@@ -143,7 +181,8 @@ function submit() {
                         Custo
                     </label>
 
-                    <input id="cost" v-model="form.cost" type="number" min="0" step="0.01" placeholder="Ex.: 350.00"
+                    <input id="cost" v-model="form.cost" type="text" inputmode="decimal" maxlength="13" pattern="(?:[0-9]{1,3}(?:\.[0-9]{3})*|[0-9]{1,8})(,[0-9]{1,2})?" placeholder="Ex.: 350,00"
+                        @keydown="blockDecimalKeys" @input="maskCost"
                         class="w-full rounded-md border bg-background px-3 py-2" />
 
                     <p v-if="form.errors.cost" class="mt-1 text-sm text-red-500">

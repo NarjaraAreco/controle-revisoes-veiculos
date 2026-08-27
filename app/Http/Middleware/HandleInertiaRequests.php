@@ -40,12 +40,19 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user()?->only([
+                    'id',
+                    'name',
+                    'email',
+                    'role',
+                    'person_id',
+                ]),
             ],
             'client' => $request->session()->has('client_person_id')
                 ? (Person::query()
+                    ->select(['id', 'name', 'email'])
                     ->find($request->session()->get('client_person_id'))
-                    ?->only(['id', 'name', 'email']))
+                    ?->toArray())
                 : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];

@@ -2,6 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { computed, ref } from 'vue';
 
 interface Revision {
     id: number;
@@ -21,9 +22,39 @@ interface Revision {
     };
 }
 
-const { revisions } = defineProps<{
+const props = defineProps<{
     revisions: Revision[];
 }>();
+
+type SortKey = 'maintenance_type' | 'revision_date' | 'vehicle' | 'mileage' | 'cost';
+const sortKey = ref<SortKey>('revision_date');
+const sortDirection = ref<'asc' | 'desc'>('desc');
+
+function sortBy(key: SortKey) {
+    if (sortKey.value === key) {
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+        return;
+    }
+
+    sortKey.value = key;
+    sortDirection.value = 'asc';
+}
+
+const sortedRevisions = computed(() => [...props.revisions].sort((left, right) => {
+    const getValue = (revision: Revision): string | number => {
+        if (sortKey.value === 'vehicle') return revision.vehicle.plate;
+        if (sortKey.value === 'mileage') return revision.mileage;
+        if (sortKey.value === 'cost') return Number(revision.cost ?? 0);
+        return revision[sortKey.value];
+    };
+
+    const leftValue = getValue(left);
+    const rightValue = getValue(right);
+    const result = typeof leftValue === 'number' && typeof rightValue === 'number'
+        ? leftValue - rightValue
+        : String(leftValue).localeCompare(String(rightValue), 'pt-BR');
+    return sortDirection.value === 'asc' ? result : -result;
+}));
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -92,22 +123,22 @@ function deleteRevision(id: number) {
                 Nenhuma revisão cadastrada.
             </div>
 
-            <div v-else class="overflow-x-auto rounded-lg border">
-                <table class="w-full text-left text-sm">
-                    <thead class="border-b bg-muted/50">
+            <div v-else class="max-h-[32rem] overflow-auto rounded-lg border">
+                <table class="w-full min-w-[1050px] text-left text-sm">
+                    <thead class="sticky top-0 z-10 border-b bg-muted/95">
                         <tr>
-                            <th class="px-4 py-3">Tipo</th>
-                            <th class="px-4 py-3">Data</th>
-                            <th class="px-4 py-3">Veículo</th>
-                            <th class="px-4 py-3">Quilometragem</th>
-                            <th class="px-4 py-3">Custo</th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('maintenance_type')">Tipo ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('revision_date')">Data ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('vehicle')">Veículo ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('mileage')">Quilometragem ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('cost')">Custo ↕</button></th>
                             <th class="px-4 py-3">Próxima revisão</th>
                             <th class="px-4 py-3">Ações</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        <tr v-for="revision in revisions" :key="revision.id" class="border-b last:border-0">
+                        <tr v-for="revision in sortedRevisions" :key="revision.id" class="border-b last:border-0">
                             <td class="px-4 py-3">
                                 {{ formatMaintenanceType(revision.maintenance_type) }}
                             </td>
@@ -124,6 +155,10 @@ function deleteRevision(id: number) {
                                 <div class="text-muted-foreground">
                                     {{ revision.vehicle.brand }}
                                     {{ revision.vehicle.model }}
+                                </div>
+
+                                <div class="text-xs text-muted-foreground">
+                                    Proprietário: {{ revision.vehicle.person?.name || 'Sem proprietário' }}
                                 </div>
                             </td>
 

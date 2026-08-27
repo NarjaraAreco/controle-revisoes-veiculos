@@ -3,6 +3,13 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { onMounted, ref } from 'vue';
+import {
+    blockNonNumericKeys,
+    formatPlate,
+    sanitizeDigits,
+    showClientErrors,
+    validateVehicle,
+} from '@/lib/clientValidation';
 
 interface Person {
     id: number;
@@ -59,6 +66,11 @@ const form = useForm({
     year: '',
     color: '',
 });
+
+function sanitizePlate() {
+    form.plate = formatPlate(form.plate);
+}
+
 //API cores
 async function loadColors() {
     colorsLoading.value = true;
@@ -132,6 +144,12 @@ async function loadModels() {
 }
 
 function submit() {
+    const errors = validateVehicle(form, maxYear);
+    if (Object.keys(errors).length > 0) {
+        showClientErrors(errors);
+        return;
+    }
+
     form.post('/vehicles');
 }
 
@@ -162,7 +180,7 @@ onMounted(() => {
                         Proprietário
                     </label>
 
-                    <select id="person_id" v-model="form.person_id" required
+                    <select id="person_id" v-model="form.person_id" required :disabled="Boolean(selectedPersonId)"
                         class="w-full rounded-md border bg-background px-3 py-2">
                         <option value="">Selecione o proprietário</option>
 
@@ -170,6 +188,10 @@ onMounted(() => {
                             {{ person.name }}
                         </option>
                     </select>
+
+                    <p v-if="selectedPersonId" class="mt-1 text-sm text-muted-foreground">
+                        O proprietário foi definido pela pessoa selecionada.
+                    </p>
 
                     <p v-if="form.errors.person_id" class="mt-1 text-sm text-red-500">
                         {{ form.errors.person_id }}
@@ -181,8 +203,9 @@ onMounted(() => {
                         Placa
                     </label>
 
-                    <input id="plate" v-model="form.plate" type="text" required maxlength="7" placeholder="ABC1D23"
-                        class="w-full rounded-md border bg-background px-3 py-2 uppercase" />
+                    <input id="plate" v-model="form.plate" type="text" required maxlength="8" placeholder="ABC-1234"
+                        class="w-full rounded-md border bg-background px-3 py-2 uppercase"
+                        @input="sanitizePlate" />
 
                     <p v-if="form.errors.plate" class="mt-1 text-sm text-red-500">
                         {{ form.errors.plate }}
@@ -197,17 +220,17 @@ onMounted(() => {
                     <select id="brand" v-model="form.brand" required :disabled="brandsLoading"
                         class="w-full rounded-md border bg-background px-3 py-2" @change="loadModels">
                         <option value="">
-                            {{
-                                brandsLoading
-                                    ? 'Carregando marcas...'
-                                    : 'Selecione a marca'
-                            }}
+                            {{ brandsLoading ? 'Carregando marcas...' : 'Selecione a marca' }}
                         </option>
 
                         <option v-for="brand in brands" :key="brand.id" :value="brand.name">
                             {{ brand.name }}
                         </option>
                     </select>
+
+                    <p v-if="brandsLoading" class="mt-1 text-sm text-muted-foreground">
+                        Carregando marcas da API/cache...
+                    </p>
 
                     <p v-if="brandsError" class="mt-1 text-sm text-red-500">
                         {{ brandsError }}
@@ -226,19 +249,17 @@ onMounted(() => {
                     <select id="model" v-model="form.model" required :disabled="!form.brand || modelsLoading"
                         class="w-full rounded-md border bg-background px-3 py-2">
                         <option value="">
-                            {{
-                                !form.brand
-                                    ? 'Selecione uma marca primeiro'
-                                    : modelsLoading
-                                        ? 'Carregando modelos...'
-                                        : 'Selecione o modelo'
-                            }}
+                            {{ !form.brand ? 'Selecione uma marca primeiro' : modelsLoading ? 'Carregando modelos...' : 'Selecione o modelo' }}
                         </option>
 
                         <option v-for="model in models" :key="model.id" :value="model.name">
                             {{ model.name }}
                         </option>
                     </select>
+
+                    <p v-if="modelsLoading" class="mt-1 text-sm text-muted-foreground">
+                        Carregando modelos da API/cache...
+                    </p>
 
                     <p v-if="modelsError" class="mt-1 text-sm text-red-500">
                         {{ modelsError }}
@@ -254,6 +275,7 @@ onMounted(() => {
                     </label>
 
                     <input id="year" v-model="form.year" type="number" required min="1900" :max="maxYear"
+                        inputmode="numeric" @keydown="blockNonNumericKeys" @input="form.year = sanitizeDigits(form.year, 4)"
                         class="w-full rounded-md border bg-background px-3 py-2" />
 
                     <p v-if="form.errors.year" class="mt-1 text-sm text-red-500">

@@ -63,7 +63,15 @@ class VehicleController extends Controller
     public function edit(Vehicle $vehicle): Response
     {
         return Inertia::render('vehicles/Edit', [
-            'vehicle' => $vehicle,
+            'vehicle' => $vehicle->only([
+                'id',
+                'person_id',
+                'plate',
+                'brand',
+                'model',
+                'year',
+                'color',
+            ]),
             'people' => Person::query()
                 ->orderBy('name')
                 ->get(['id', 'name']),

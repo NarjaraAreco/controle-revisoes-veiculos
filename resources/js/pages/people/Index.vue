@@ -2,6 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { computed, ref } from 'vue';
 
 interface Person {
     id: number;
@@ -12,9 +13,30 @@ interface Person {
     state: string | null;
 }
 
-defineProps<{
+const props = defineProps<{
     people: Person[];
 }>();
+
+type SortKey = 'name' | 'cpf' | 'email' | 'city';
+const sortKey = ref<SortKey>('name');
+const sortDirection = ref<'asc' | 'desc'>('asc');
+
+function sortBy(key: SortKey) {
+    if (sortKey.value === key) {
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+        return;
+    }
+
+    sortKey.value = key;
+    sortDirection.value = 'asc';
+}
+
+const sortedPeople = computed(() => [...props.people].sort((left, right) => {
+    const leftValue = String(left[sortKey.value] ?? (sortKey.value === 'city' ? '' : '')).toLocaleLowerCase();
+    const rightValue = String(right[sortKey.value] ?? (sortKey.value === 'city' ? '' : '')).toLocaleLowerCase();
+    const result = leftValue.localeCompare(rightValue, 'pt-BR');
+    return sortDirection.value === 'asc' ? result : -result;
+}));
 
 const deleteForm = useForm({});
 
@@ -56,20 +78,20 @@ const breadcrumbs: BreadcrumbItem[] = [
                 Nenhuma pessoa cadastrada.
             </div>
 
-            <div v-else class="overflow-x-auto rounded-lg border">
-                <table class="w-full text-left text-sm">
-                    <thead class="border-b bg-muted/50">
+            <div v-else class="max-h-[32rem] overflow-auto rounded-lg border">
+                <table class="w-full min-w-[900px] text-left text-sm">
+                    <thead class="sticky top-0 z-10 border-b bg-muted/95">
                         <tr>
-                            <th class="px-4 py-3">Nome</th>
-                            <th class="px-4 py-3">CPF</th>
-                            <th class="px-4 py-3">E-mail</th>
-                            <th class="px-4 py-3">Cidade/UF</th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('name')">Nome ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('cpf')">CPF ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('email')">E-mail ↕</button></th>
+                            <th class="px-4 py-3"><button type="button" @click="sortBy('city')">Cidade/UF ↕</button></th>
                             <th class="px-4 py-3">Ações</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        <tr v-for="person in people" :key="person.id" class="border-b last:border-0">
+                        <tr v-for="person in sortedPeople" :key="person.id" class="border-b last:border-0">
                             <td class="px-4 py-3">{{ person.name }}</td>
                             <td class="px-4 py-3">{{ person.cpf }}</td>
                             <td class="px-4 py-3">

@@ -113,7 +113,7 @@ class ReportController extends Controller
                 v.year,
                 v.color
             FROM people AS p
-            JOIN vehicles AS v ON v.person_id = p.id
+            LEFT JOIN vehicles AS v ON v.person_id = p.id
             ORDER BY p.name, v.brand, v.model
         SQL);
 
@@ -178,32 +178,19 @@ class ReportController extends Controller
             'total' => (int) $row->total,
         ])->values();
 
-        $peopleWithMostVehiclesByGender = collect($this->selectCached(<<<'SQL'
-            WITH vehicle_counts AS (
-                SELECT
-                    p.id,
-                    p.name,
-                    p.gender,
-                    COUNT(v.id) AS vehicles_count,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY p.gender
-                        ORDER BY COUNT(v.id) DESC, p.name
-                    ) AS position
-                FROM people AS p
-                JOIN vehicles AS v ON v.person_id = p.id
-                WHERE p.gender IN ('Feminino', 'Masculino')
-                GROUP BY p.id, p.name, p.gender
-            )
-            SELECT id, name, gender, vehicles_count
-            FROM vehicle_counts
-            WHERE position = 1
-            ORDER BY gender
+        $vehiclesByGender = collect($this->selectCached(<<<'SQL'
+            SELECT
+                genders.gender,
+                COUNT(v.id) AS total
+            FROM (VALUES ('Feminino'), ('Masculino')) AS genders(gender)
+            LEFT JOIN people AS p ON p.gender = genders.gender
+            LEFT JOIN vehicles AS v ON v.person_id = p.id
+            GROUP BY genders.gender
+            ORDER BY total DESC, genders.gender
         SQL
         ))->map(fn (object $row) => [
-            'id' => (int) $row->id,
-            'name' => $row->name,
             'gender' => $row->gender,
-            'vehicles_count' => (int) $row->vehicles_count,
+            'total' => (int) $row->total,
         ])->values();
 
         $brandsByGender = collect($this->selectCached(<<<'SQL'
@@ -419,7 +406,7 @@ class ReportController extends Controller
             'vehiclesByPerson' => $vehiclesByPerson,
             'allVehicles' => $allVehicles,
             'vehiclesByYear' => $vehiclesByYear,
-            'peopleWithMostVehiclesByGender' => $peopleWithMostVehiclesByGender,
+            'vehiclesByGender' => $vehiclesByGender,
             'brandsByGender' => $brandsByGender,
             'revisionsInPeriod' => $revisionsInPeriod,
             'revisionsByMonth' => $revisionsByMonth,

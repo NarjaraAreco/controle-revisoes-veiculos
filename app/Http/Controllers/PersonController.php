@@ -54,7 +54,22 @@ class PersonController extends Controller
     public function edit(Person $person): Response
     {
         return Inertia::render('people/Edit', [
-            'person' => $person,
+            'person' => $person->only([
+                'id',
+                'name',
+                'cpf',
+                'birth_date',
+                'gender',
+                'phone',
+                'email',
+                'cep',
+                'street',
+                'number',
+                'complement',
+                'neighborhood',
+                'city',
+                'state',
+            ]),
         ]);
     }
 
