@@ -114,6 +114,11 @@ const breadcrumbs: BreadcrumbItem[] = [
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex gap-2">
+                                    <Link :href="`/revisions/create?vehicle_id=${vehicle.id}`"
+                                        class="cursor-pointer rounded-md border px-3 py-1">
+                                        Nova revisão
+                                    </Link>
+
                                     <Link :href="`/vehicles/${vehicle.id}/edit`"
                                         class="cursor-pointer rounded-md border px-3 py-1">
                                         Editar

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use App\Concerns\DataCache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -432,14 +432,21 @@ class ReportController extends Controller
     {
         $key = 'report-query:'.md5($sql.'|'.serialize($bindings));
 
-        /** @var array<int, object> $rows */
-        $rows = Cache::remember(
+        /** @var array<int, array<string, mixed>> $cachedRows */
+        $cachedRows = DataCache::remember(
             $key,
-            now()->addSeconds(30),
-            fn (): array => DB::select($sql, $bindings),
+            fn (): array => array_map(
+                static fn (object $row): array => (array) $row,
+                DB::select($sql, $bindings),
+            ),
         );
 
-        return $rows;
+        // Mantém o formato usado pelas transformações do relatório, mas o
+        // cache fica livre de objetos PHP frágeis entre requisições.
+        return array_map(
+            static fn (array $row): object => (object) $row,
+            $cachedRows,
+        );
     }
 
     /**

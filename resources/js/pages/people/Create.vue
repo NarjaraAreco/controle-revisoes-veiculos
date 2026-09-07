@@ -14,6 +14,10 @@ import {
     validatePerson,
 } from '@/lib/clientValidation';
 
+const { existingCpfs } = defineProps<{
+    existingCpfs: string[];
+}>();
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Pessoas',
@@ -122,7 +126,7 @@ function submit() {
         return;
     }
 
-    const errors = validatePerson(form);
+    const errors = validatePerson(form, existingCpfs);
     if (Object.keys(errors).length > 0) {
         showClientErrors(errors);
         return;

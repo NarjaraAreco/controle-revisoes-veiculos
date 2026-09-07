@@ -7,6 +7,7 @@ use App\Models\Person;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Http\Requests\StorePersonRequest;
+use App\Concerns\DataCache;
 use Illuminate\Http\RedirectResponse;
 
 class PersonController extends Controller
@@ -17,10 +18,12 @@ class PersonController extends Controller
     public function index(): Response
     {
         return Inertia::render('people/Index', [
-            'people' => Person::query()
+            'people' => DataCache::remember('people.index', fn () => Person::query()
                 ->select(['id', 'name', 'cpf', 'email', 'city', 'state'])
                 ->orderBy('name')
-                ->get(),
+                ->get()
+                ->map(fn (Person $person): array => $person->toArray())
+                ->all()),
         ]);
     }
 
@@ -29,7 +32,12 @@ class PersonController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('people/Create');
+        return Inertia::render('people/Create', [
+            'existingCpfs' => DataCache::remember('people.cpf-list', fn () => Person::query()
+                ->pluck('cpf')
+                ->map(fn ($cpf) => (string) $cpf)
+                ->all()),
+        ]);
     }
 
     /**
@@ -38,6 +46,7 @@ class PersonController extends Controller
     public function store(StorePersonRequest $request): RedirectResponse
     {
         Person::create($request->validated());
+        DataCache::invalidate();
 
         return to_route('people.index')
             ->with('success', 'Pessoa cadastrada com sucesso.');
@@ -70,6 +79,11 @@ class PersonController extends Controller
                 'city',
                 'state',
             ]),
+            'existingCpfs' => DataCache::remember("people.cpf-list.except.{$person->id}", fn () => Person::query()
+                ->whereKeyNot($person->id)
+                ->pluck('cpf')
+                ->map(fn ($cpf) => (string) $cpf)
+                ->all()),
         ]);
     }
 
@@ -78,6 +92,7 @@ class PersonController extends Controller
         Person $person
     ): RedirectResponse {
         $person->update($request->validated());
+        DataCache::invalidate();
 
         return to_route('people.index')
             ->with('success', 'Pessoa atualizada com sucesso.');
@@ -86,6 +101,7 @@ class PersonController extends Controller
     public function destroy(Person $person): RedirectResponse
     {
         $person->delete();
+        DataCache::invalidate();
 
         return to_route('people.index')
             ->with('success', 'Pessoa excluída com sucesso.');

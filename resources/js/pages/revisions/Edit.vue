@@ -2,7 +2,6 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { computed } from 'vue';
 import {
     blockDecimalKeys,
     blockNonNumericKeys,
@@ -66,10 +65,6 @@ function maskCost() {
     form.cost = formatCost(form.cost);
 }
 
-const selectedVehicle = computed(() =>
-    vehicles.find((vehicle) => String(vehicle.id) === form.vehicle_id),
-);
-
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Revisões',
@@ -117,7 +112,7 @@ function submit() {
                         Veículo
                     </label>
 
-                    <select id="vehicle_id" v-model="form.vehicle_id" required
+                    <select id="vehicle_id" v-model="form.vehicle_id" required disabled
                         class="w-full rounded-md border bg-background px-3 py-2">
                         <option value="">Selecione o veículo</option>
 
@@ -129,10 +124,6 @@ function submit() {
                             {{ vehicle.person?.name || 'Sem proprietário' }}
                         </option>
                     </select>
-
-                    <p v-if="selectedVehicle" class="mt-1 text-sm text-muted-foreground">
-                        Proprietário: {{ selectedVehicle.person?.name || 'Sem proprietário' }}
-                    </p>
 
                     <p v-if="form.errors.vehicle_id" class="mt-1 text-sm text-red-500">
                         {{ form.errors.vehicle_id }}

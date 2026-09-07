@@ -136,6 +136,35 @@ function digits(value: unknown): string {
     return text(value).replace(/\D/g, '');
 }
 
+const fieldLabels: Record<string, string> = {
+    name: 'Nome completo',
+    cpf: 'CPF',
+    birth_date: 'Data de nascimento',
+    gender: 'Sexo',
+    phone: 'Telefone',
+    email: 'E-mail',
+    cep: 'CEP',
+    street: 'Rua',
+    number: 'Número',
+    complement: 'Complemento',
+    neighborhood: 'Bairro',
+    city: 'Cidade',
+    state: 'Estado',
+    person_id: 'Proprietário',
+    plate: 'Placa',
+    brand: 'Marca',
+    model: 'Modelo',
+    year: 'Ano',
+    color: 'Cor',
+    vehicle_id: 'Veículo',
+    maintenance_type: 'Tipo de manutenção',
+    revision_date: 'Data da revisão',
+    mileage: 'Quilometragem',
+    description: 'Descrição dos serviços',
+    cost: 'Custo',
+    next_revision_date: 'Próxima revisão',
+};
+
 function validCpf(value: unknown): boolean {
     const cpf = digits(value);
 
@@ -162,7 +191,7 @@ function validDate(value: unknown): boolean {
     return Boolean(date) && !Number.isNaN(Date.parse(`${date}T00:00:00`));
 }
 
-export function validatePerson(value: object): ClientErrors {
+export function validatePerson(value: object, existingCpfs: string[] = []): ClientErrors {
     const fields = value as Record<string, unknown>;
     const errors: ClientErrors = {};
     const name = text(fields.name);
@@ -172,7 +201,11 @@ export function validatePerson(value: object): ClientErrors {
 
     if (name.length < 3) errors.name = 'Informe o nome completo (mínimo de 3 caracteres).';
     if (name.length > 255) errors.name = 'O nome deve ter no máximo 255 caracteres.';
-    if (!validCpf(cpf)) errors.cpf = 'Informe um CPF válido.';
+    if (!validCpf(cpf)) {
+        errors.cpf = 'Informe um CPF válido.';
+    } else if (existingCpfs.some((existingCpf) => digits(existingCpf) === digits(cpf))) {
+        errors.cpf = 'Este CPF já está cadastrado.';
+    }
     if (!validDate(birthDate)) errors.birth_date = 'Informe uma data de nascimento válida.';
     if (birthDate && birthDate > new Date().toISOString().slice(0, 10)) {
         errors.birth_date = 'A data de nascimento não pode estar no futuro.';
@@ -182,7 +215,6 @@ export function validatePerson(value: object): ClientErrors {
 
     const limits: Record<string, number> = {
         phone: 20,
-        cep: 8,
         street: 255,
         number: 20,
         complement: 255,
@@ -192,7 +224,7 @@ export function validatePerson(value: object): ClientErrors {
 
     Object.entries(limits).forEach(([field, limit]) => {
         const valueText = text(fields[field]);
-        if (valueText.length > limit) errors[field] = `Este campo deve ter no máximo ${limit} caracteres.`;
+        if (valueText.length > limit) errors[field] = `${fieldLabels[field]} deve ter no máximo ${limit} caracteres.`;
     });
 
     if (text(fields.cep) && digits(fields.cep).length !== 8) errors.cep = 'O CEP deve possuir 8 dígitos.';
@@ -247,6 +279,10 @@ export function validateRevision(value: object): ClientErrors {
 
 export function showClientErrors(errors: ClientErrors): void {
     if (Object.keys(errors).length > 0) {
-        window.alert(`Corrija os campos antes de salvar:\n\n${Object.values(errors).join('\n')}`);
+        const messages = Object.entries(errors).map(([field, message]) =>
+            field === 'cpf' ? message : `${fieldLabels[field] ?? 'Campo'}: ${message}`,
+        );
+
+        window.alert(`Corrija os campos antes de salvar:\n\n${messages.join('\n')}`);
     }
 }

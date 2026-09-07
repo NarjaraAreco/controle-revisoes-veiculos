@@ -8,6 +8,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\Person;
 use App\Http\Requests\StoreVehicleRequest;
+use App\Concerns\DataCache;
 use Illuminate\Http\RedirectResponse;
 
 class VehicleController extends Controller
@@ -18,12 +19,14 @@ class VehicleController extends Controller
     public function index(): Response
     {
         return Inertia::render('vehicles/Index', [
-            'vehicles' => Vehicle::query()
+            'vehicles' => DataCache::remember('vehicles.index', fn () => Vehicle::query()
                 ->select(['id', 'person_id', 'plate', 'brand', 'model', 'year', 'color'])
                 ->with('person:id,name')
                 ->orderBy('brand')
                 ->orderBy('model')
-                ->get(),
+                ->get()
+                ->map(fn (Vehicle $vehicle): array => $vehicle->toArray())
+                ->all()),
         ]);
     }
 
@@ -33,9 +36,11 @@ class VehicleController extends Controller
     public function create(Request $request): Response
     {
         return Inertia::render('vehicles/Create', [
-            'people' => Person::query()
+            'people' => DataCache::remember('people.options', fn () => Person::query()
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'name'])
+                ->map(fn (Person $person): array => $person->toArray())
+                ->all()),
 
             'selectedPersonId' => $request->integer('person_id') ?: null,
         ]);
@@ -47,6 +52,7 @@ class VehicleController extends Controller
     public function store(StoreVehicleRequest $request): RedirectResponse
     {
         Vehicle::create($request->validated());
+        DataCache::invalidate();
 
         return to_route('vehicles.index')
             ->with('success', 'Veículo cadastrado com sucesso.');
@@ -72,9 +78,11 @@ class VehicleController extends Controller
                 'year',
                 'color',
             ]),
-            'people' => Person::query()
+            'people' => DataCache::remember('people.options', fn () => Person::query()
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'name'])
+                ->map(fn (Person $person): array => $person->toArray())
+                ->all()),
         ]);
     }
 
@@ -83,6 +91,7 @@ class VehicleController extends Controller
         Vehicle $vehicle
     ): RedirectResponse {
         $vehicle->update($request->validated());
+        DataCache::invalidate();
 
         return to_route('vehicles.index')
             ->with('success', 'Veículo atualizado com sucesso.');
@@ -91,6 +100,7 @@ class VehicleController extends Controller
     public function destroy(Vehicle $vehicle): RedirectResponse
     {
         $vehicle->delete();
+        DataCache::invalidate();
 
         return to_route('vehicles.index')
             ->with('success', 'Ve   ículo excluído com sucesso.');

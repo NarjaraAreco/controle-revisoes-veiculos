@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Person;
 use App\Models\Vehicle;
+use App\Concerns\DataCache;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -79,58 +79,64 @@ class DashboardController extends Controller
             ]);
         }
 
-        $vehiclesByBrand = Vehicle::query()
-            ->selectRaw('brand, COUNT(*) as total')
-            ->groupBy('brand')
-            ->orderByDesc('total')
-            ->get()
-            ->map(fn ($item) => [
-                'brand' => $item->brand,
-                'total' => (int) $item->total,
-            ])
-            ->values();
+        $dashboardData = DataCache::remember('dashboard.admin', function (): array {
+            $vehiclesByBrand = Vehicle::query()
+                ->selectRaw('brand, COUNT(*) as total')
+                ->groupBy('brand')
+                ->orderByDesc('total')
+                ->get()
+                ->map(fn ($item) => [
+                    'brand' => $item->brand,
+                    'total' => (int) $item->total,
+                ])
+                ->values()
+                ->all();
 
-        $peopleWithVehicles = Person::query()
-            ->withCount('vehicles')
-            ->orderByDesc('vehicles_count')
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($person) => [
-                'id' => $person->id,
-                'name' => $person->name,
-                'total' => (int) $person->vehicles_count,
-            ])
-            ->values();
+            $peopleWithVehicles = Person::query()
+                ->withCount('vehicles')
+                ->orderByDesc('vehicles_count')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($person) => [
+                    'id' => $person->id,
+                    'name' => $person->name,
+                    'total' => (int) $person->vehicles_count,
+                ])
+                ->values()
+                ->all();
 
-        $revisionsByMonth = collect(DB::select(<<<'SQL'
-            SELECT
-                TO_CHAR(DATE_TRUNC('month', revision_date), 'YYYY-MM') AS month,
-                COUNT(*) AS total
-            FROM revisions
-            WHERE revision_date IS NOT NULL
-            GROUP BY DATE_TRUNC('month', revision_date)
-            ORDER BY month
-        SQL
-        ))->map(fn (object $row) => [
-            'month' => $row->month,
-            'total' => (int) $row->total,
-        ])->values();
+            $revisionsByMonth = collect(DB::select(<<<'SQL'
+                SELECT
+                    TO_CHAR(DATE_TRUNC('month', revision_date), 'YYYY-MM') AS month,
+                    COUNT(*) AS total
+                FROM revisions
+                WHERE revision_date IS NOT NULL
+                GROUP BY DATE_TRUNC('month', revision_date)
+                ORDER BY month
+            SQL
+            ))->map(fn (object $row) => [
+                'month' => $row->month,
+                'total' => (int) $row->total,
+            ])->values()->all();
 
-        $totals = DB::selectOne(<<<'SQL'
-            SELECT
-                (SELECT COUNT(*) FROM people) AS people,
-                (SELECT COUNT(*) FROM vehicles) AS vehicles,
-                (SELECT COUNT(*) FROM revisions) AS revisions
-        SQL
-        );
+            $totals = DB::selectOne(<<<'SQL'
+                SELECT
+                    (SELECT COUNT(*) FROM people) AS people,
+                    (SELECT COUNT(*) FROM vehicles) AS vehicles,
+                    (SELECT COUNT(*) FROM revisions) AS revisions
+            SQL
+            );
 
-        return Inertia::render('Dashboard', [
-            'totalPeople' => (int) $totals->people,
-            'totalVehicles' => (int) $totals->vehicles,
-            'totalRevisions' => (int) $totals->revisions,
-            'vehiclesByBrand' => $vehiclesByBrand,
-            'peopleWithVehicles' => $peopleWithVehicles,
-            'revisionsByMonth' => $revisionsByMonth,
-        ]);
+            return [
+                'totalPeople' => (int) $totals->people,
+                'totalVehicles' => (int) $totals->vehicles,
+                'totalRevisions' => (int) $totals->revisions,
+                'vehiclesByBrand' => $vehiclesByBrand,
+                'peopleWithVehicles' => $peopleWithVehicles,
+                'revisionsByMonth' => $revisionsByMonth,
+            ];
+        });
+
+        return Inertia::render('Dashboard', $dashboardData);
     }
 }

@@ -26,7 +26,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (str_starts_with((string) config('app.url'), 'https://')) {
+        // O ngrok usa HTTPS publicamente, mas o acesso local continua em HTTP.
+        // Forçar HTTPS em localhost faz o Laravel gerar scripts como
+        // https://localhost:8000, que não carregam no servidor local.
+        if (
+            ! app()->runningInConsole()
+            && str_starts_with((string) config('app.url'), 'https://')
+            && ! in_array(request()->getHost(), ['localhost', '127.0.0.1', '::1'], true)
+        ) {
             URL::forceScheme('https');
         }
 

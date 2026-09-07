@@ -6,15 +6,17 @@ use App\Http\Requests\StoreRevisionRequest;
 use App\Models\Revision;
 use App\Models\Vehicle;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Concerns\DataCache;
 
 class RevisionController extends Controller
 {
     public function index(): Response
     {
         return Inertia::render('revisions/Index', [
-            'revisions' => Revision::query()
+            'revisions' => DataCache::remember('revisions.index', fn () => Revision::query()
                 ->select([
                     'id',
                     'vehicle_id',
@@ -29,14 +31,14 @@ class RevisionController extends Controller
                     'vehicle.person:id,name',
                 ])
                 ->orderByDesc('revision_date')
-                ->get(),
+                ->get()),
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         return Inertia::render('revisions/Create', [
-            'vehicles' => Vehicle::with('person')
+            'vehicles' => DataCache::remember('vehicles.options', fn () => Vehicle::with('person')
                 ->orderBy('plate')
                 ->get([
                     'id',
@@ -44,13 +46,18 @@ class RevisionController extends Controller
                     'plate',
                     'brand',
                     'model',
-                ]),
+                ])
+                ->map(fn (Vehicle $vehicle): array => $vehicle->toArray())
+                ->all()),
+
+            'selectedVehicleId' => $request->integer('vehicle_id') ?: null,
         ]);
     }
 
     public function store(StoreRevisionRequest $request): RedirectResponse
     {
         Revision::create($request->validated());
+        DataCache::invalidate();
 
         return to_route('revisions.index')
             ->with('success', 'Revisão cadastrada com sucesso.');
@@ -74,7 +81,7 @@ class RevisionController extends Controller
                 'cost',
                 'next_revision_date',
             ]),
-            'vehicles' => Vehicle::with('person')
+            'vehicles' => DataCache::remember('vehicles.options', fn () => Vehicle::with('person')
                 ->orderBy('plate')
                 ->get([
                     'id',
@@ -82,7 +89,9 @@ class RevisionController extends Controller
                     'plate',
                     'brand',
                     'model',
-                ]),
+                ])
+                ->map(fn (Vehicle $vehicle): array => $vehicle->toArray())
+                ->all()),
         ]);
     }
 
@@ -91,6 +100,7 @@ class RevisionController extends Controller
         Revision $revision
     ): RedirectResponse {
         $revision->update($request->validated());
+        DataCache::invalidate();
 
         return to_route('revisions.index')
             ->with('success', 'Revisão atualizada com sucesso.');
@@ -99,6 +109,7 @@ class RevisionController extends Controller
     public function destroy(Revision $revision): RedirectResponse
     {
         $revision->delete();
+        DataCache::invalidate();
 
         return to_route('revisions.index')
             ->with('success', 'Revisão excluída com sucesso.');

@@ -189,10 +189,6 @@ onMounted(() => {
                         </option>
                     </select>
 
-                    <p v-if="selectedPersonId" class="mt-1 text-sm text-muted-foreground">
-                        O proprietário foi definido pela pessoa selecionada.
-                    </p>
-
                     <p v-if="form.errors.person_id" class="mt-1 text-sm text-red-500">
                         {{ form.errors.person_id }}
                     </p>

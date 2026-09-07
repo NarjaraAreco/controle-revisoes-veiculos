@@ -73,6 +73,7 @@ class StoreVehicleRequest extends FormRequest
     {
         return [
             'person_id.required' => 'Selecione o proprietário.',
+            'person_id.integer' => 'Proprietário: selecione um valor válido.',
             'person_id.exists' => 'O proprietário selecionado não existe.',
 
             'plate.required' => 'Informe a placa.',
@@ -81,10 +82,16 @@ class StoreVehicleRequest extends FormRequest
             'plate.unique' => 'Esta placa já está cadastrada.',
 
             'brand.required' => 'Informe a marca.',
+            'brand.string' => 'Marca: informe um texto válido.',
+            'brand.max' => 'Marca: não pode ultrapassar 255 caracteres.',
             'model.required' => 'Informe o modelo.',
+            'model.string' => 'Modelo: informe um texto válido.',
+            'model.max' => 'Modelo: não pode ultrapassar 255 caracteres.',
             'year.required' => 'Informe o ano.',
+            'year.integer' => 'Ano: informe um número inteiro.',
             'year.between' => 'Informe um ano válido.',
 
+            'color.string' => 'Cor: informe um texto válido.',
             'color.max' => 'A cor não pode ultrapassar 30 caracteres.',
         ];
     }

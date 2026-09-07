@@ -22,7 +22,7 @@ class ValidCpf implements ValidationRule
             strlen($cpf) !== 11 ||
             preg_match('/^(\d)\1{10}$/', $cpf)
         ) {
-            $fail('O CPF informado é inválido.');
+            $fail('O valor informado é inválido.');
 
             return;
         }
@@ -38,7 +38,7 @@ class ValidCpf implements ValidationRule
             $digit = $remainder === 10 ? 0 : $remainder;
 
             if ($digit !== (int) $cpf[$position]) {
-                $fail('O CPF informado é inválido.');
+                $fail('O valor informado é inválido.');
 
                 return;
             }

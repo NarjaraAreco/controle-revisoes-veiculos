@@ -31,8 +31,9 @@ interface Person {
     state: string | null;
 }
 
-const { person } = defineProps<{
+const { person, existingCpfs } = defineProps<{
     person: Person;
+    existingCpfs: string[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -146,7 +147,7 @@ function submit() {
         return;
     }
 
-    const errors = validatePerson(form);
+    const errors = validatePerson(form, existingCpfs);
     if (Object.keys(errors).length > 0) {
         showClientErrors(errors);
         return;

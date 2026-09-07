@@ -200,17 +200,6 @@ function submit() {
         return;
     }
 
-    if (form.person_id !== String(vehicle.person_id)) {
-        const confirmed = window.confirm(
-            'Este veículo será vinculado a outro proprietário. Deseja continuar?',
-        );
-
-        if (!confirmed) {
-            form.person_id = String(vehicle.person_id);
-            return;
-        }
-    }
-
     form.put(`/vehicles/${vehicle.id}`);
 }
 
@@ -226,7 +215,7 @@ function submit() {
                 <h1 class="text-2xl font-semibold">Atualize veículo</h1>
 
                 <p class="text-muted-foreground">
-                    Edite um veículo e vincule-o a um proprietário.
+                    Edite os dados do veículo.
                 </p>
             </div>
 
@@ -236,7 +225,7 @@ function submit() {
                         Proprietário
                     </label>
 
-                    <select id="person_id" v-model="form.person_id" required
+                    <select id="person_id" v-model="form.person_id" required disabled
                         class="w-full rounded-md border bg-background px-3 py-2">
                         <option value="">Selecione o proprietário</option>
 

@@ -2,7 +2,6 @@
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import {
-    BookOpen,
     Car,
     ChartBar,
     FolderGit2,
@@ -76,13 +75,8 @@ const clientNavItems: NavItem[] = [
 const footerNavItems: NavItem[] = [
     {
         title: 'Repositório',
-        href: 'https://github.com/laravel/vue-starter-kit',
+        href: 'https://github.com/NarjaraAreco/controle-revisoes-veiculos',
         icon: FolderGit2,
-    },
-    {
-        title: 'Documentação',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
     },
 ];
 
